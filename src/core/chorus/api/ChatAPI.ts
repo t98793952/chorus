@@ -375,10 +375,8 @@ export function useDeleteAllChats() {
             await db.execute("DELETE FROM chats");
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries(chatQueries.list());
-            await queryClient.invalidateQueries({
-                queryKey: ["search", "results"],
-            });
+            await queryClient.invalidateQueries({ queryKey: chatQueries.list().queryKey });
+            await queryClient.invalidateQueries({ queryKey: ["search", "results"] });
         },
     });
 }

@@ -15,6 +15,7 @@ const PROVIDER_TO_API_KEY: Record<string, keyof ApiKeys> = {
     perplexity: "perplexity",
     openrouter: "openrouter",
     grok: "grok",
+    "openai-compatible": "openaiCompatible",
 };
 
 /**
@@ -27,6 +28,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
     perplexity: "Perplexity",
     openrouter: "OpenRouter",
     grok: "xAI",
+    "openai-compatible": "OpenAI-Compatible",
 };
 
 /**
@@ -57,6 +59,11 @@ export function canProceedWithProvider(
 
     // Local models (ollama, lmstudio) don't require API keys
     if (providerKey === "ollama" || providerKey === "lmstudio") {
+        return { canProceed: true };
+    }
+
+    // OpenAI-compatible doesn't require API key (it's optional)
+    if (providerKey === "openai-compatible") {
         return { canProceed: true };
     }
 

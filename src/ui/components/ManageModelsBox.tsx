@@ -46,6 +46,7 @@ import * as AppMetadataAPI from "@core/chorus/api/AppMetadataAPI";
 import { hasApiKey } from "@core/utilities/ProxyUtils";
 import * as ModelsAPI from "@core/chorus/api/ModelsAPI";
 import * as MessageAPI from "@core/chorus/api/MessageAPI";
+import { SettingsManager } from "@core/utilities/Settings";
 
 // Helper function to filter models by search terms
 const filterBySearch = (models: ModelConfig[], searchTerms: string[]) => {
@@ -152,6 +153,11 @@ function ModelGroup({
 
             // Local models (ollama, lmstudio) don't require API keys
             if (provider === "ollama" || provider === "lmstudio") {
+                return false;
+            }
+
+            // OpenAI-compatible doesn't require API key (configured separately)
+            if (provider === "openai-compatible") {
                 return false;
             }
 
@@ -309,6 +315,8 @@ export function ManageModelsBox({
     const modelConfigs = ModelsAPI.useModelConfigs();
     const showOpenRouter = AppMetadataAPI.useShowOpenRouter();
     const setShowOpenRouterMutation = AppMetadataAPI.useSetShowOpenRouter();
+    const showOpenAICompatible = AppMetadataAPI.useShowOpenAICompatible();
+    const setShowOpenAICompatibleMutation = AppMetadataAPI.useSetShowOpenAICompatible();
 
     const selectedSingleModelConfig = useMemo(() => {
         if (mode.type === "single") {
@@ -326,6 +334,7 @@ export function ManageModelsBox({
         ollama: false,
         lmstudio: false,
         openrouter: false,
+        "openai-compatible": false,
     });
     const listRef = useRef<HTMLDivElement>(null);
 
@@ -412,9 +421,10 @@ export function ManageModelsBox({
     const refreshLMStudio = ModelsAPI.useRefreshLMStudioModels();
     const refreshOllama = ModelsAPI.useRefreshOllamaModels();
     const refreshOpenRouter = ModelsAPI.useRefreshOpenRouterModels();
+    const refreshOpenAICompatible = ModelsAPI.useRefreshOpenAICompatibleModels();
 
     const handleRefreshProviders = async (
-        provider: "ollama" | "lmstudio" | "openrouter",
+        provider: "ollama" | "lmstudio" | "openrouter" | "openai-compatible",
     ) => {
         setSpinningProviders((prev) => ({ ...prev, [provider]: true }));
         try {
@@ -424,6 +434,15 @@ export function ManageModelsBox({
                 await refreshLMStudio.mutateAsync();
             } else if (provider === "openrouter") {
                 await refreshOpenRouter.mutateAsync();
+            } else if (provider === "openai-compatible") {
+                const settings = await SettingsManager.getInstance().get();
+                const baseUrl = settings.apiKeys?.["openai-compatible-url"];
+                if (baseUrl) {
+                    await refreshOpenAICompatible.mutateAsync({
+                        baseUrl,
+                        apiKey: settings.apiKeys?.["openai-compatible"],
+                    });
+                }
             }
         } finally {
             setTimeout(() => {
@@ -465,10 +484,15 @@ export function ManageModelsBox({
             (m) => getProviderName(m.modelId) === "openrouter",
         );
 
+        const openaiCompatibleModels = systemModels.filter(
+            (m) => getProviderName(m.modelId) === "openai-compatible",
+        );
+
         return {
             custom: filterBySearch(userModels, searchTerms),
             local: filterBySearch(localModels, searchTerms),
             openrouter: filterBySearch(openrouterModels, searchTerms),
+            openaiCompatible: filterBySearch(openaiCompatibleModels, searchTerms),
         };
     }, [modelConfigs.data, searchQuery]);
 
@@ -580,9 +604,77 @@ export function ManageModelsBox({
                 <CommandList ref={listRef}>
                     <CommandEmpty>No models found</CommandEmpty>
 
-                    {/* OpenRouter Models - main list */}
-                    {(modelGroups.openrouter.length > 0 ||
-                        searchQuery === "") && (
+                    {/* OpenAI-Compatible Models - only show if baseUrl configured */}
+                    {apiKeys?.["openai-compatible-url"] && (
+                        <ModelGroup
+                            heading={
+                                <div className="flex items-center justify-between w-full">
+                                    <span>OpenAI-Compatible</span>
+                                    {showOpenAICompatible && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setShowOpenAICompatibleMutation.mutate(false);
+                                            }}
+                                            className="p-1.5 hover:bg-accent text-muted-foreground/50 rounded-md flex items-center gap-1"
+                                            title="Hide OpenAI-Compatible models"
+                                        >
+                                            <ChevronUpIcon className="w-3 h-3" />
+                                            <span className="text-[10px]">Hide</span>
+                                        </button>
+                                    )}
+                                </div>
+                            }
+                            models={modelGroups.openaiCompatible}
+                            checkedModelConfigIds={checkedModelConfigIds}
+                            mode={mode}
+                            onToggleModelConfig={handleToggleModelConfig}
+                            onAddApiKey={handleAddApiKey}
+                            groupId="openai-compatible"
+                            refreshButton={
+                                showOpenAICompatible && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            void handleRefreshProviders("openai-compatible");
+                                        }}
+                                        className="p-1.5 hover:bg-accent text-muted-foreground/50 rounded-md flex items-center gap-2"
+                                        title="Refresh OpenAI-Compatible models"
+                                    >
+                                        <RefreshCcwIcon
+                                            className={`w-3 h-3 ${
+                                                spinningProviders["openai-compatible"]
+                                                    ? "animate-spin"
+                                                    : ""
+                                            }`}
+                                        />
+                                        <span className="text-sm">Refresh</span>
+                                    </button>
+                                )
+                            }
+                            emptyState={
+                                !showOpenAICompatible ? (
+                                    <div className="px-2 mb-4">
+                                        <Button
+                                            variant="outline"
+                                            className="w-full"
+                                            size="sm"
+                                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                                e.preventDefault();
+                                                setShowOpenAICompatibleMutation.mutate(true);
+                                            }}
+                                        >
+                                            Show OpenAI-Compatible models
+                                        </Button>
+                                    </div>
+                                ) : undefined
+                            }
+                        />
+                    )}
+
+                    {/* OpenRouter Models - only show if API key configured */}
+                    {apiKeys?.openrouter && (
                         <ModelGroup
                             heading={
                                 <div className="flex items-center justify-between w-full">

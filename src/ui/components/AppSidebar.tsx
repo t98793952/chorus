@@ -103,11 +103,9 @@ function groupChatsByDate(chats: Chat[]) {
     const lastWeek: Chat[] = [];
     const older: Chat[] = [];
     chats.forEach((chat) => {
-        const utcDate = new Date(chat.updatedAt || 0);
-        // Convert to local time
-        const date = new Date(
-            utcDate.getTime() - utcDate.getTimezoneOffset() * 60000,
-        );
+        // SQLite CURRENT_TIMESTAMP is UTC, append Z to parse as UTC
+        const timestamp = chat.updatedAt || "1970-01-01";
+        const date = new Date(timestamp.includes("Z") ? timestamp : timestamp + "Z");
 
         if (isToday(date)) {
             today.push(chat);

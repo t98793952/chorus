@@ -1,132 +1,87 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { SettingsManager } from "@core/utilities/Settings";
+import { streamResponse, ModelConfig } from "./Models";
+import { getApiKeys, getInternalTaskModelConfigId } from "./api/AppMetadataAPI";
+import { db } from "./DB";
 
-type SimpleLLMParams = {
-    model: string;
-    maxTokens: number;
+type ModelConfigDBRow = {
+    id: string;
+    display_name: string;
+    author: "user" | "system";
+    model_id: string;
+    system_prompt: string;
+    is_enabled: boolean;
+    supported_attachment_types: string;
+    is_default: boolean;
+    is_internal: boolean;
+    is_deprecated: boolean;
+    budget_tokens: number | null;
+    reasoning_effort: "low" | "medium" | "high" | null;
 };
 
-/**
- * Makes a simple LLM call using the Anthropic SDK directly.
- * Used for generating chat titles.
- */
-export async function simpleLLM(
-    prompt: string,
-    params: SimpleLLMParams,
-): Promise<string> {
-    const settingsManager = SettingsManager.getInstance();
-    const settings = await settingsManager.get();
-    const apiKey = settings.apiKeys?.anthropic;
-
-    if (!apiKey) {
-        throw new Error("Please add your Anthropic API key in Settings.");
-    }
-
-    const client = new Anthropic({
-        apiKey,
-        dangerouslyAllowBrowser: true,
-    });
-
-    const stream = client.messages.stream({
-        model: params.model,
-        max_tokens: params.maxTokens,
-        messages: [
-            {
-                role: "user",
-                content: prompt,
-            },
-        ],
-    });
-
-    let fullResponse = "";
-
-    stream.on("text", (text: string) => {
-        fullResponse += text;
-    });
-
-    await stream.finalMessage();
-
-    return fullResponse;
+async function getModelConfigById(id: string): Promise<ModelConfig | null> {
+    const rows = await db.select<ModelConfigDBRow[]>(
+        `SELECT mc.id, mc.display_name, mc.author, mc.model_id, mc.system_prompt, 
+                m.is_enabled, m.supported_attachment_types, mc.is_default, 
+                m.is_internal, m.is_deprecated, mc.budget_tokens, mc.reasoning_effort
+         FROM model_configs mc
+         JOIN models m ON mc.model_id = m.id
+         WHERE mc.id = ?`,
+        [id],
+    );
+    if (rows.length === 0) return null;
+    const row = rows[0];
+    return {
+        id: row.id,
+        displayName: row.display_name,
+        author: row.author,
+        modelId: row.model_id,
+        systemPrompt: row.system_prompt,
+        isEnabled: row.is_enabled,
+        supportedAttachmentTypes: JSON.parse(row.supported_attachment_types),
+        isDefault: row.is_default,
+        isInternal: row.is_internal,
+        isDeprecated: row.is_deprecated,
+        budgetTokens: row.budget_tokens ?? undefined,
+        reasoningEffort: row.reasoning_effort ?? undefined,
+    };
 }
 
 /**
- * Makes a simple LLM call using Google's Gemini models via OpenAI-compatible API.
- * Used for generating chat titles and summaries.
+ * Makes a simple LLM call using the user's selected internal task model.
+ * Used for generating chat titles and project summaries.
+ * Returns empty string if no model configured or on error.
  */
-export async function simpleSummarizeLLM(
-    prompt: string,
-    params: SimpleLLMParams,
-): Promise<string> {
-    const settingsManager = SettingsManager.getInstance();
-    const settings = await settingsManager.get();
-    const apiKey = settings.apiKeys?.google;
-
-    if (!apiKey) {
-        throw new Error("Please add your Google AI API key in Settings.");
-    }
-
-    // Use Google's OpenAI-compatible endpoint
-    const response = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model: params.model,
-                max_tokens: params.maxTokens,
-                stream: true,
-                messages: [
-                    {
-                        role: "user",
-                        content: prompt,
-                    },
-                ],
-            }),
-        },
-    );
-
-    if (!response.ok) {
-        throw new Error(`Google API error: ${response.statusText}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("No reader available");
-
-    const decoder = new TextDecoder();
-    let fullResponse = "";
-
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-            if (line.startsWith("data: ")) {
-                try {
-                    const dataStr = line.slice(6);
-                    if (dataStr === "[DONE]") continue;
-
-                    const data = JSON.parse(dataStr) as {
-                        choices?: Array<{
-                            delta?: { content?: string };
-                        }>;
-                    };
-
-                    const content = data.choices?.[0]?.delta?.content;
-                    if (content) {
-                        fullResponse += content;
-                    }
-                } catch (e) {
-                    console.warn("Error parsing chunk:", e);
-                }
-            }
+export async function simpleLLM(prompt: string): Promise<string> {
+    try {
+        const modelConfigId = await getInternalTaskModelConfigId();
+        if (!modelConfigId) {
+            return "";
         }
-    }
 
-    return fullResponse;
+        const modelConfig = await getModelConfigById(modelConfigId);
+        if (!modelConfig || !modelConfig.isEnabled) {
+            return "";
+        }
+
+        const apiKeys = await getApiKeys();
+
+        let fullResponse = "";
+
+        await streamResponse({
+            modelConfig,
+            llmConversation: [{ role: "user", content: prompt, attachments: [] }],
+            apiKeys,
+            onChunk: (chunk) => {
+                fullResponse += chunk;
+            },
+            onComplete: async () => {},
+            onError: (err) => {
+                console.error("simpleLLM error:", err);
+            },
+        });
+
+        return fullResponse;
+    } catch (err) {
+        console.error("simpleLLM error:", err);
+        return "";
+    }
 }

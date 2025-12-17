@@ -87,10 +87,7 @@ Generate exactly 2 suggestions as a JSON array of strings. Each suggestion shoul
                     // Use simpleLLM to generate suggestions
                     let response: string;
                     try {
-                        response = await simpleLLM(prompt, {
-                            model: "claude-3-5-sonnet-latest",
-                            maxTokens: 512,
-                        });
+                        response = await simpleLLM(prompt);
                     } catch (llmError) {
                         console.error("Error calling simpleLLM:", llmError);
                         // Don't show suggestions if LLM fails

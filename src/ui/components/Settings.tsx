@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from "@ui/components/ui/select";
@@ -86,6 +88,7 @@ import ImportChatDialog from "./ImportChatDialog";
 import { dialogActions } from "@core/infra/DialogStore";
 import * as AppMetadataAPI from "@core/chorus/api/AppMetadataAPI";
 import * as ChatAPI from "@core/chorus/api/ChatAPI";
+import * as ModelsAPI from "@core/chorus/api/ModelsAPI";
 import { PermissionsTab } from "./PermissionsTab";
 import { cn } from "@ui/lib/utils";
 
@@ -1137,6 +1140,79 @@ interface Settings {
     customToolsets?: CustomToolsetConfig[];
 }
 
+function getProviderDisplayName(modelId: string): string {
+    const provider = modelId.split("::")[0];
+    const names: Record<string, string> = {
+        openai: "OpenAI",
+        anthropic: "Anthropic",
+        google: "Google",
+        openrouter: "OpenRouter",
+        ollama: "Ollama",
+        lmstudio: "LM Studio",
+        grok: "Grok",
+        perplexity: "Perplexity",
+        "openai-compatible": "OpenAI Compatible",
+    };
+    return names[provider] || provider;
+}
+
+function InternalTaskModelSelector() {
+    const modelConfigs = ModelsAPI.useModelConfigs();
+    const { data: apiKeys } = AppMetadataAPI.useApiKeys();
+    const internalTaskModelConfigId = AppMetadataAPI.useInternalTaskModelConfigId();
+    const setInternalTaskModelConfigId = AppMetadataAPI.useSetInternalTaskModelConfigId();
+
+    // Filter models by API key availability
+    const enabledModels = modelConfigs.data?.filter((m) => {
+        if (!m.isEnabled || m.isInternal || m.isDeprecated) return false;
+        const provider = m.modelId.split("::")[0];
+        if (provider === "ollama" || provider === "lmstudio") return true;
+        if (provider === "openai-compatible") return !!apiKeys?.["openai-compatible-url"];
+        return !!apiKeys?.[provider as keyof typeof apiKeys];
+    }) || [];
+
+    // Group by provider
+    const grouped = enabledModels.reduce((acc, m) => {
+        const provider = m.modelId.split("::")[0];
+        if (!acc[provider]) acc[provider] = [];
+        acc[provider].push(m);
+        return acc;
+    }, {} as Record<string, typeof enabledModels>);
+
+    return (
+        <div className="pt-4">
+            <label className="block font-semibold mb-2">
+                Internal Task Model
+            </label>
+            <p className="text-sm text-muted-foreground mb-2">
+                Model used for generating chat titles and project summaries
+            </p>
+            <Select
+                value={internalTaskModelConfigId || ""}
+                onValueChange={(value) => 
+                    void setInternalTaskModelConfigId.mutateAsync(value || null)
+                }
+            >
+                <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a model" />
+                </SelectTrigger>
+                <SelectContent>
+                    {Object.entries(grouped).map(([provider, models]) => (
+                        <SelectGroup key={provider}>
+                            <SelectLabel className="pl-2">{getProviderDisplayName(provider + "::x")}</SelectLabel>
+                            {models.map((model) => (
+                                <SelectItem key={model.id} value={model.id} className="text-muted-foreground">
+                                    {model.displayName}
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    );
+}
+
 function DangerZone() {
     const [confirming, setConfirming] = useState(false);
     const deleteAllChats = ChatAPI.useDeleteAllChats();
@@ -1152,36 +1228,39 @@ function DangerZone() {
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-2">
             <div className="font-semibold text-destructive">Danger Zone</div>
-            <p className="text-sm text-muted-foreground">
-                This action cannot be undone. All your chat history will be permanently deleted.
-            </p>
-            {confirming ? (
-                <div className="flex gap-2">
+            <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                    This action cannot be undone. All your chat history will be permanently deleted.
+                </p>
+                {confirming ? (
+                    <div className="flex gap-2 shrink-0 ml-4">
+                        <Button variant="outline" size="sm" onClick={() => setConfirming(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive border-destructive"
+                            onClick={() => void handleDelete()}
+                            disabled={deleteAllChats.isPending}
+                        >
+                            {deleteAllChats.isPending ? "Deleting..." : "Confirm"}
+                        </Button>
+                    </div>
+                ) : (
                     <Button
-                        variant="destructive"
+                        variant="outline"
                         size="sm"
-                        onClick={() => void handleDelete()}
-                        disabled={deleteAllChats.isPending}
+                        className="text-destructive hover:text-destructive shrink-0 ml-4"
+                        onClick={() => setConfirming(true)}
                     >
-                        {deleteAllChats.isPending ? "Deleting..." : "Confirm Delete All"}
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete All Chats
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setConfirming(false)}>
-                        Cancel
-                    </Button>
-                </div>
-            ) : (
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setConfirming(true)}
-                >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete All Chats
-                </Button>
-            )}
+                )}
+            </div>
         </div>
     );
 }
@@ -1260,7 +1339,7 @@ export default function Settings({ tab = "general" }: SettingsProps) {
             ...currentSettings.apiKeys,
             [provider]: value,
         };
-        setApiKeys(newApiKeys);
+        setApiKeys(newApiKeys as Record<string, string>);
         void settingsManager.set({
             ...currentSettings,
             apiKeys: newApiKeys,
@@ -1653,6 +1732,8 @@ export default function Settings({ tab = "general" }: SettingsProps) {
                                         }
                                     />
                                 </div>
+
+                                <InternalTaskModelSelector />
                             </div>
 
                             <Separator className="my-4" />

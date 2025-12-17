@@ -3,7 +3,7 @@ import { Label } from "./ui/label";
 import { ProviderName } from "@core/chorus/Models";
 import { ProviderLogo } from "./ui/provider-logo";
 import { Card } from "./ui/card";
-import { CheckIcon, FlameIcon } from "lucide-react";
+import { CheckIcon, FlameIcon, PlugIcon } from "lucide-react";
 import { useState } from "react";
 
 interface ApiKeysFormProps {
@@ -57,12 +57,21 @@ export default function ApiKeysForm({
             url: "https://console.x.ai/settings/keys",
         },
         {
+            id: "openai-compatible",
+            name: "OpenAI-Compatible",
+            placeholder: "sk-...",
+            url: "",
+        },
+        {
             id: "firecrawl",
             name: "Firecrawl",
             placeholder: "fc-...",
             url: "https://www.firecrawl.dev/app/api-keys",
         },
     ];
+
+    const selectedProviderData = providers.find((p) => p.id === selectedProvider);
+    const isOpenAICompatible = selectedProvider === "openai-compatible";
 
     return (
         <div className="space-y-6">
@@ -80,6 +89,8 @@ export default function ApiKeysForm({
                         <div className="flex flex-col items-center gap-2 text-center">
                             {provider.id === "firecrawl" ? (
                                 <FlameIcon className="w-4 h-4" />
+                            ) : provider.id === "openai-compatible" ? (
+                                <PlugIcon className="w-4 h-4" />
                             ) : (
                                 <ProviderLogo
                                     provider={provider.id as ProviderName}
@@ -88,7 +99,7 @@ export default function ApiKeysForm({
                             )}
                             <span className="font-medium">{provider.name}</span>
                         </div>
-                        {apiKeys[provider.id] && (
+                        {(apiKeys[provider.id] || (provider.id === "openai-compatible" && apiKeys["openai-compatible-url"])) && (
                             <div className="absolute top-2 right-2">
                                 <CheckIcon className="w-4 h-4 text-green-500" />
                             </div>
@@ -99,46 +110,49 @@ export default function ApiKeysForm({
 
             {selectedProvider && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
+                    {isOpenAICompatible && (
+                        <div className="space-y-2">
+                            <Label htmlFor="openai-compatible-base-url">
+                                Base URL
+                            </Label>
+                            <Input
+                                id="openai-compatible-base-url"
+                                placeholder="https://api.openai.com/v1"
+                                value={apiKeys["openai-compatible-url"] || ""}
+                                onChange={(e) =>
+                                    onApiKeyChange("openai-compatible-url", e.target.value)
+                                }
+                            />
+                            <p className="text-sm text-muted-foreground">
+                                The base URL of your OpenAI-compatible API endpoint
+                            </p>
+                        </div>
+                    )}
                     <div className="space-y-2">
                         <Label htmlFor={`${selectedProvider}-key`}>
-                            {
-                                providers.find((p) => p.id === selectedProvider)
-                                    ?.name
-                            }{" "}
-                            API Key
+                            {selectedProviderData?.name} API Key{isOpenAICompatible && " (optional)"}
                         </Label>
                         <Input
                             id={`${selectedProvider}-key`}
                             type="password"
-                            placeholder={
-                                providers.find((p) => p.id === selectedProvider)
-                                    ?.placeholder
-                            }
+                            placeholder={selectedProviderData?.placeholder}
                             value={apiKeys[selectedProvider] || ""}
                             onChange={(e) =>
                                 onApiKeyChange(selectedProvider, e.target.value)
                             }
                         />
-                        <p className="text-sm text-muted-foreground">
-                            <a
-                                href={
-                                    providers.find(
-                                        (p) => p.id === selectedProvider,
-                                    )?.url
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                Get{" "}
-                                {
-                                    providers.find(
-                                        (p) => p.id === selectedProvider,
-                                    )?.name
-                                }{" "}
-                                API key
-                            </a>
-                            .
-                        </p>
+                        {selectedProviderData?.url && (
+                            <p className="text-sm text-muted-foreground">
+                                <a
+                                    href={selectedProviderData.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Get {selectedProviderData.name} API key
+                                </a>
+                                .
+                            </p>
+                        )}
                     </div>
                 </div>
             )}

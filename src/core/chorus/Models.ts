@@ -17,6 +17,7 @@ import { ollamaClient } from "./OllamaClient";
 import { ProviderOllama } from "./ModelProviders/ProviderOllama";
 import { ProviderLMStudio } from "./ModelProviders/ProviderLMStudio";
 import { ProviderGrok } from "./ModelProviders/ProviderGrok";
+import { ProviderOpenAICompatible } from "./ModelProviders/ProviderOpenAICompatible";
 import posthog from "posthog-js";
 import { UserTool, UserToolCall, UserToolResult } from "./Toolsets";
 import { Attachment } from "./api/AttachmentsAPI";
@@ -157,6 +158,9 @@ export type ApiKeys = {
     openrouter?: string;
     google?: string;
     grok?: string;
+    openaiCompatible?: string;
+    openaiCompatibleUrl?: string;
+    [key: string]: string | undefined;
 };
 
 export type Model = {
@@ -230,7 +234,8 @@ export type ProviderName =
     | "ollama"
     | "lmstudio"
     | "grok"
-    | "meta";
+    | "meta"
+    | "openai-compatible";
 
 /**
  * Returns a human readable label for the provider
@@ -284,6 +289,8 @@ function getProvider(providerName: string): IProvider {
             return new ProviderLMStudio();
         case "grok":
             return new ProviderGrok();
+        case "openai-compatible":
+            return new ProviderOpenAICompatible();
         default:
             throw new Error(`Unknown provider: ${providerName}`);
     }
@@ -486,6 +493,59 @@ export async function downloadLMStudioModels(db: Database): Promise<void> {
     }
 }
 
+/**
+ * Downloads models from OpenAI-Compatible endpoint to refresh the database.
+ */
+export async function downloadOpenAICompatibleModels(
+    db: Database,
+    baseUrl: string,
+    apiKey?: string,
+): Promise<number> {
+    // Disable all existing models first
+    await db.execute(
+        "UPDATE models SET is_enabled = 0 WHERE id LIKE 'openai-compatible::%'",
+    );
+
+    if (!baseUrl) return 0;
+
+    try {
+        const headers: Record<string, string> = {};
+        if (apiKey) {
+            headers["Authorization"] = `Bearer ${apiKey}`;
+        }
+
+        const response = await fetch(`${baseUrl}/models`, { headers });
+        if (!response.ok) return 0;
+
+        const { data: models } = (await response.json()) as {
+            data: { id: string }[];
+        };
+
+        // Natural sort
+        const sortedModels = models
+            .map((m) => m.id)
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+        for (const modelId of sortedModels) {
+            await saveModelAndDefaultConfig(
+                db,
+                {
+                    id: `openai-compatible::${modelId}`,
+                    displayName: modelId,
+                    supportedAttachmentTypes: ["text", "image", "webpage"],
+                    isEnabled: true,
+                    isInternal: false,
+                },
+                modelId,
+            );
+        }
+
+        return sortedModels.length;
+    } catch {
+        return 0;
+    }
+}
+
 /// ------------------------------------------------------------------------------------------------
 /// Helpers
 /// ------------------------------------------------------------------------------------------------
@@ -591,6 +651,7 @@ const CONTEXT_LIMIT_PATTERNS: Record<ProviderName, string> = {
     lmstudio: "context window", // best guess
     perplexity: "context window", // best guess
     ollama: "context window", // best guess
+    "openai-compatible": "context window", // best guess
 };
 
 /**

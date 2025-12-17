@@ -323,6 +323,27 @@ export function useRefreshLMStudioModels() {
     });
 }
 
+export function useRefreshOpenAICompatibleModels() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationKey: ["refreshOpenAICompatibleModels"] as const,
+        mutationFn: async ({
+            baseUrl,
+            apiKey,
+        }: {
+            baseUrl: string;
+            apiKey?: string;
+        }) => {
+            await Models.downloadOpenAICompatibleModels(db, baseUrl, apiKey);
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries(
+                modelConfigQueries.listConfigs(),
+            );
+        },
+    });
+}
+
 export function useRefreshModels() {
     const refreshOpenRouterModels = useRefreshOpenRouterModels();
     const refreshOllamaModels = useRefreshOllamaModels();

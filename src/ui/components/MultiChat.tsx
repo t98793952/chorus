@@ -2325,11 +2325,18 @@ export default function MultiChat() {
                                 </kbd>
                             </TooltipContent>
                         </Tooltip>
+
+                        <ProjectSwitcher />
+                    </div>
+
+                    {/* chat actions - show as individual icon buttons if there are multiple message sets AND we're not in quick chat */}
+                    <div className="flex items-center gap-1">
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
-                                    variant="link"
+                                    variant="ghost"
                                     size="iconSm"
+                                    className="px-2 text-accent-foreground hover:text-foreground"
                                     onClick={() =>
                                         getOrCreateNewChat.mutate({
                                             projectId: "default",
@@ -2349,12 +2356,6 @@ export default function MultiChat() {
                                 </kbd>
                             </TooltipContent>
                         </Tooltip>
-
-                        <ProjectSwitcher />
-                    </div>
-
-                    {/* chat actions - show as individual icon buttons if there are multiple message sets AND we're not in quick chat */}
-                    <div className="flex items-center gap-1">
                         {!isQuickChatWindow &&
                             messageSetsQuery.data &&
                             messageSetsQuery.data.length > 1 && (

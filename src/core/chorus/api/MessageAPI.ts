@@ -21,7 +21,7 @@ import * as Models from "../Models";
 import { UpdateQueue } from "../UpdateQueue";
 import posthog from "posthog-js";
 import { v4 as uuidv4 } from "uuid";
-import { simpleLLM, simpleSummarizeLLM } from "../simpleLLM";
+import { simpleLLM } from "../simpleLLM";
 import * as Prompts from "../prompts/prompts";
 import { useNavigate } from "react-router-dom";
 import { ToolsetsManager } from "../ToolsetsManager";
@@ -2164,11 +2164,7 @@ export function useSummarizeChat() {
                           conversationText,
                       );
 
-            const summary = await simpleSummarizeLLM(prompt, {
-                // NOTE: If you change this model _provider_, you'll need to update the response handling in simpleSummarizeLLM.ts
-                model: "gemini-2.5-flash",
-                maxTokens: 8192,
-            });
+            const summary = await simpleLLM(prompt);
 
             await db.execute("UPDATE chats SET summary = $1 WHERE id = $2", [
                 summary,
@@ -2924,10 +2920,6 @@ If there's no information in the message, just return "Untitled Chat".
 <message>
 ${userMessageText}
 </message>`,
-                {
-                    model: "claude-3-5-sonnet-latest",
-                    maxTokens: 100,
-                },
             );
             // Extract title from XML tags and clean it up
             const match = fullResponse.match(/<title>(.*?)<\/title>/s);

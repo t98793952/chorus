@@ -14,6 +14,9 @@ export interface Settings {
         perplexity?: string;
         openrouter?: string;
         firecrawl?: string;
+        openaiCompatible?: string;
+        openaiCompatibleUrl?: string;
+        [key: string]: string | undefined;
     };
     quickChat?: {
         enabled?: boolean;

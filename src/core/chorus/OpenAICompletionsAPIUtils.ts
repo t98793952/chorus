@@ -196,6 +196,7 @@ function convertToolCalls(
     // adapted from a snippet on https://platform.openai.com/docs/guides/function-calling?api-mode=chat&lang=javascript
     // which appears to be severely buggy (lol)
     for (const chunk of chunks) {
+        if (!chunk.choices?.[0]?.delta) continue;
         const toolCallDeltas = chunk.choices[0].delta.tool_calls || [];
         for (const toolCallDelta of toolCallDeltas) {
             const index = toolCallDelta.index ?? 0;

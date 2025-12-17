@@ -103,6 +103,29 @@ export function useShowOpenRouter() {
     return appMetadata?.["show_openrouter"] === "true";
 }
 
+export function useSetShowOpenAICompatible() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationKey: ["setShowOpenAICompatible"] as const,
+        mutationFn: async (show: boolean) => {
+            await db.execute(
+                "INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)",
+                ["show_openai_compatible", show ? "true" : "false"],
+            );
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: appMetadataKeys.appMetadata(),
+            });
+        },
+    });
+}
+
+export function useShowOpenAICompatible() {
+    const { data: appMetadata } = useAppMetadata();
+    return appMetadata?.["show_openai_compatible"] !== "false";
+}
+
 export function useHasDismissedOnboarding() {
     const { data: appMetadata } = useAppMetadata();
     return appMetadata?.["has_dismissed_onboarding"] === "true";
@@ -257,4 +280,41 @@ export function useSetZoomLevel() {
             });
         },
     });
+}
+
+
+export function useInternalTaskModelConfigId() {
+    const { data: appMetadata } = useAppMetadata();
+    return appMetadata?.["internal_task_model_config_id"];
+}
+
+export function useSetInternalTaskModelConfigId() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationKey: ["setInternalTaskModelConfigId"] as const,
+        mutationFn: async (modelConfigId: string | null) => {
+            if (modelConfigId) {
+                await db.execute(
+                    "INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)",
+                    ["internal_task_model_config_id", modelConfigId],
+                );
+            } else {
+                await db.execute(
+                    "DELETE FROM app_metadata WHERE key = 'internal_task_model_config_id'",
+                );
+            }
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: appMetadataKeys.appMetadata(),
+            });
+        },
+    });
+}
+
+export async function getInternalTaskModelConfigId(): Promise<string | undefined> {
+    const result = await db.select<{ value: string }[]>(
+        "SELECT value FROM app_metadata WHERE key = 'internal_task_model_config_id'",
+    );
+    return result[0]?.value;
 }
