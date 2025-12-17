@@ -367,6 +367,22 @@ export function useDeleteChat() {
     });
 }
 
+export function useDeleteAllChats() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationKey: ["deleteAllChats"] as const,
+        mutationFn: async () => {
+            await db.execute("DELETE FROM chats");
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries(chatQueries.list());
+            await queryClient.invalidateQueries({
+                queryKey: ["search", "results"],
+            });
+        },
+    });
+}
+
 export function useRenameChat() {
     const queryClient = useQueryClient();
     return useMutation({

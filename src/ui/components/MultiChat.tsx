@@ -32,6 +32,7 @@ import {
     FolderOpenIcon,
     ReplyIcon,
     Trash2Icon,
+    SquarePlusIcon,
 } from "lucide-react";
 import { useAppContext } from "@ui/hooks/useAppContext";
 import { ChevronDownIcon, CopyIcon, CheckIcon, XIcon } from "lucide-react";
@@ -1737,6 +1738,7 @@ export default function MultiChat() {
     const { isQuickChatWindow } = useAppContext();
 
     const createQuickChat = ChatAPI.useGetOrCreateNewQuickChat();
+    const getOrCreateNewChat = ChatAPI.useGetOrCreateNewChat();
     const projectsQuery = useQuery(ProjectAPI.projectQueries.list());
     const setChatProject = ProjectAPI.useSetChatProject();
     const createProject = ProjectAPI.useCreateProject();
@@ -2320,6 +2322,30 @@ export default function MultiChat() {
                                 Forward{" "}
                                 <kbd>
                                     <span>⌘</span>]
+                                </kbd>
+                            </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="link"
+                                    size="iconSm"
+                                    onClick={() =>
+                                        getOrCreateNewChat.mutate({
+                                            projectId: "default",
+                                        })
+                                    }
+                                >
+                                    <SquarePlusIcon
+                                        strokeWidth={1.5}
+                                        className="!size-3.5"
+                                    />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                                Start New Chat{" "}
+                                <kbd>
+                                    <span>⌘</span>N
                                 </kbd>
                             </TooltipContent>
                         </Tooltip>

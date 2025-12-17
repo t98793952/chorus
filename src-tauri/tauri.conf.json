@@ -52,7 +52,7 @@
         "targets": "all",
         "resources": ["resources/**/*"],
         "icon": ["icons/icon.icns", "icons/icon.ico"],
-        "createUpdaterArtifacts": true,
+        "createUpdaterArtifacts": false,
         "externalBin": [
             "binaries/mcp-desktopcommander",
             "binaries/mcp-github",

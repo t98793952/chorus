@@ -565,6 +565,7 @@ export function ChatInput({
                     onPaste={(e) => void handlePaste(e)}
                     rows={2}
                     onKeyDown={(e) => {
+                        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                         if (cautiousEnter) {
                             // Cautious mode: Cmd+Enter to submit
                             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -765,6 +766,7 @@ export function ChatInput({
                 onPaste={(e) => handlePaste(e)}
                 rows={2}
                 onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                     if (cautiousEnter) {
                         // Cautious mode: Cmd+Enter to submit
                         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

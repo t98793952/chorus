@@ -85,6 +85,7 @@ import { SiOpenai } from "react-icons/si";
 import ImportChatDialog from "./ImportChatDialog";
 import { dialogActions } from "@core/infra/DialogStore";
 import * as AppMetadataAPI from "@core/chorus/api/AppMetadataAPI";
+import * as ChatAPI from "@core/chorus/api/ChatAPI";
 import { PermissionsTab } from "./PermissionsTab";
 import { cn } from "@ui/lib/utils";
 
@@ -1136,6 +1137,55 @@ interface Settings {
     customToolsets?: CustomToolsetConfig[];
 }
 
+function DangerZone() {
+    const [confirming, setConfirming] = useState(false);
+    const deleteAllChats = ChatAPI.useDeleteAllChats();
+
+    const handleDelete = async () => {
+        try {
+            await deleteAllChats.mutateAsync();
+            toast.success("All chats deleted");
+            setConfirming(false);
+        } catch {
+            toast.error("Failed to delete chats");
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="font-semibold text-destructive">Danger Zone</div>
+            <p className="text-sm text-muted-foreground">
+                This action cannot be undone. All your chat history will be permanently deleted.
+            </p>
+            {confirming ? (
+                <div className="flex gap-2">
+                    <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => void handleDelete()}
+                        disabled={deleteAllChats.isPending}
+                    >
+                        {deleteAllChats.isPending ? "Deleting..." : "Confirm Delete All"}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setConfirming(false)}>
+                        Cancel
+                    </Button>
+                </div>
+            ) : (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setConfirming(true)}
+                >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete All Chats
+                </Button>
+            )}
+        </div>
+    );
+}
+
 export default function Settings({ tab = "general" }: SettingsProps) {
     const settingsManager = SettingsManager.getInstance();
     const { mode, setMode, setSansFont, setMonoFont, sansFont } = useTheme();
@@ -1604,6 +1654,10 @@ export default function Settings({ tab = "general" }: SettingsProps) {
                                     />
                                 </div>
                             </div>
+
+                            <Separator className="my-4" />
+
+                            <DangerZone />
 
                             <div className="flex justify-end mt-4 mb-2"></div>
                         </div>
