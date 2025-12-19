@@ -197,6 +197,7 @@ export type ModelConfig = {
     supportedAttachmentTypes: AttachmentType[];
     isInternal: boolean; // internal model configs are never shown to users
     isDeprecated: boolean; // deprecated models are filtered out from the UI
+    isPinned: boolean; // pinned models appear at the top of their provider group
 
     // controls the actual behavior
     modelId: string;

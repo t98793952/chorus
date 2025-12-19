@@ -2458,5 +2458,13 @@ You have full access to bash commands on the user''''s computer. If you write a 
                     ('selected_model_configs_compare', '["openrouter::anthropic/claude-opus-4.5"]');
             "#,
         },
+        Migration {
+            version: 132,
+            description: "add is_pinned column to model_configs",
+            kind: MigrationKind::Up,
+            sql: r#"
+                ALTER TABLE model_configs ADD COLUMN is_pinned BOOLEAN DEFAULT 0;
+            "#,
+        },
     ];
 }

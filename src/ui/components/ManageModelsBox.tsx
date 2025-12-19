@@ -28,6 +28,7 @@ import {
     ArrowBigUpIcon,
     CircleCheckIcon,
     ChevronUpIcon,
+    PinIcon,
 } from "lucide-react";
 import { ProviderLogo } from "./ui/provider-logo";
 import {
@@ -59,6 +60,15 @@ const filterBySearch = (models: ModelConfig[], searchTerms: string[]) => {
                 m.displayName.toLowerCase().includes(term) ||
                 providerLabel.toLowerCase().includes(term),
         );
+    });
+};
+
+// Helper function to sort models with pinned ones first
+const sortByPinned = (models: ModelConfig[]) => {
+    return [...models].sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return a.displayName.localeCompare(b.displayName, undefined, { numeric: true });
     });
 };
 
@@ -129,6 +139,7 @@ function ModelGroup({
     checkedModelConfigIds,
     mode,
     onToggleModelConfig,
+    onTogglePin,
     refreshButton,
     emptyState,
     onAddApiKey,
@@ -139,6 +150,7 @@ function ModelGroup({
     checkedModelConfigIds: string[];
     mode: ModelPickerMode;
     onToggleModelConfig: (id: string) => void;
+    onTogglePin?: (id: string, isPinned: boolean) => void;
     refreshButton?: React.ReactNode;
     emptyState?: React.ReactNode;
     onAddApiKey: () => void;
@@ -250,10 +262,19 @@ function ModelGroup({
                                                   ? "remove"
                                                   : "add"}
                                         </p>
-                                        {checkedModelConfigIds.includes(
-                                            m.id,
-                                        ) && (
+                                        {checkedModelConfigIds.includes(m.id) ? (
                                             <CircleCheckIcon className="!w-5 !h-5 ml-2 fill-primary text-primary-foreground" />
+                                        ) : onTogglePin && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onTogglePin(m.id, !m.isPinned);
+                                                }}
+                                                className={`p-1 rounded hover:bg-accent ${m.isPinned ? "" : "text-muted-foreground/50 opacity-0 group-hover:opacity-100"} transition-opacity`}
+                                                title={m.isPinned ? "Unpin" : "Pin to top"}
+                                            >
+                                                <PinIcon className={`w-3.5 h-3.5 ${m.isPinned ? "fill-primary text-primary" : ""}`} />
+                                            </button>
                                         )}
                                     </>
                                 )}
@@ -422,6 +443,11 @@ export function ManageModelsBox({
     const refreshOllama = ModelsAPI.useRefreshOllamaModels();
     const refreshOpenRouter = ModelsAPI.useRefreshOpenRouterModels();
     const refreshOpenAICompatible = ModelsAPI.useRefreshOpenAICompatibleModels();
+    const togglePin = ModelsAPI.useTogglePinModelConfig();
+
+    const handleTogglePin = useCallback((modelConfigId: string, isPinned: boolean) => {
+        togglePin.mutate({ modelConfigId, isPinned });
+    }, [togglePin]);
 
     const handleRefreshProviders = async (
         provider: "ollama" | "lmstudio" | "openrouter" | "openai-compatible",
@@ -489,10 +515,10 @@ export function ManageModelsBox({
         );
 
         return {
-            custom: filterBySearch(userModels, searchTerms),
-            local: filterBySearch(localModels, searchTerms),
-            openrouter: filterBySearch(openrouterModels, searchTerms),
-            openaiCompatible: filterBySearch(openaiCompatibleModels, searchTerms),
+            custom: sortByPinned(filterBySearch(userModels, searchTerms)),
+            local: sortByPinned(filterBySearch(localModels, searchTerms)),
+            openrouter: sortByPinned(filterBySearch(openrouterModels, searchTerms)),
+            openaiCompatible: sortByPinned(filterBySearch(openaiCompatibleModels, searchTerms)),
         };
     }, [modelConfigs.data, searchQuery]);
 
@@ -630,6 +656,7 @@ export function ManageModelsBox({
                             checkedModelConfigIds={checkedModelConfigIds}
                             mode={mode}
                             onToggleModelConfig={handleToggleModelConfig}
+                            onTogglePin={handleTogglePin}
                             onAddApiKey={handleAddApiKey}
                             groupId="openai-compatible"
                             refreshButton={
@@ -703,6 +730,7 @@ export function ManageModelsBox({
                             checkedModelConfigIds={checkedModelConfigIds}
                             mode={mode}
                             onToggleModelConfig={handleToggleModelConfig}
+                            onTogglePin={handleTogglePin}
                             onAddApiKey={handleAddApiKey}
                             groupId="openrouter"
                             refreshButton={
@@ -802,6 +830,7 @@ export function ManageModelsBox({
                             checkedModelConfigIds={checkedModelConfigIds}
                             mode={mode}
                             onToggleModelConfig={handleToggleModelConfig}
+                            onTogglePin={handleTogglePin}
                             onAddApiKey={handleAddApiKey}
                             groupId="custom"
                         />
@@ -814,6 +843,7 @@ export function ManageModelsBox({
                         checkedModelConfigIds={checkedModelConfigIds}
                         mode={mode}
                         onToggleModelConfig={handleToggleModelConfig}
+                        onTogglePin={handleTogglePin}
                         onAddApiKey={handleAddApiKey}
                         groupId="local"
                         refreshButton={

@@ -66,6 +66,7 @@ type ModelConfigDBRow = {
     budget_tokens: number | null;
     reasoning_effort: "low" | "medium" | "high" | null;
     new_until?: string;
+    is_pinned: boolean;
 };
 
 function readModel(row: ModelDBRow): Models.Model {
@@ -97,6 +98,7 @@ function readModelConfig(row: ModelConfigDBRow): ModelConfig {
         budgetTokens: row.budget_tokens ?? undefined,
         reasoningEffort: row.reasoning_effort ?? undefined,
         newUntil: row.new_until ?? undefined,
+        isPinned: row.is_pinned,
     };
 }
 
@@ -106,7 +108,8 @@ export async function fetchModelConfigs() {
             `SELECT model_configs.id, model_configs.display_name, model_configs.author, 
                         model_configs.model_id, model_configs.system_prompt, models.is_enabled, 
                         models.is_internal, models.supported_attachment_types, model_configs.is_default,
-                        models.is_deprecated, model_configs.budget_tokens, model_configs.reasoning_effort, model_configs.new_until
+                        models.is_deprecated, model_configs.budget_tokens, model_configs.reasoning_effort, 
+                        model_configs.new_until, model_configs.is_pinned
                  FROM model_configs 
                  JOIN models ON model_configs.model_id = models.id
                  ORDER BY models.is_enabled DESC`,
@@ -393,6 +396,24 @@ export function useUpdateModelConfig() {
             await db.execute(
                 "UPDATE model_configs SET display_name = $1, system_prompt = $2 WHERE id = $3",
                 [displayName, systemPrompt, modelConfigId],
+            );
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries(
+                modelConfigQueries.listConfigs(),
+            );
+        },
+    });
+}
+
+export function useTogglePinModelConfig() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationKey: ["togglePinModelConfig"] as const,
+        mutationFn: async ({ modelConfigId, isPinned }: { modelConfigId: string; isPinned: boolean }) => {
+            await db.execute(
+                "UPDATE model_configs SET is_pinned = $1 WHERE id = $2",
+                [isPinned ? 1 : 0, modelConfigId],
             );
         },
         onSuccess: async () => {

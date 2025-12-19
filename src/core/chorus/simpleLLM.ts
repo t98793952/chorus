@@ -15,13 +15,14 @@ type ModelConfigDBRow = {
     is_deprecated: boolean;
     budget_tokens: number | null;
     reasoning_effort: "low" | "medium" | "high" | null;
+    is_pinned: boolean;
 };
 
 async function getModelConfigById(id: string): Promise<ModelConfig | null> {
     const rows = await db.select<ModelConfigDBRow[]>(
         `SELECT mc.id, mc.display_name, mc.author, mc.model_id, mc.system_prompt, 
                 m.is_enabled, m.supported_attachment_types, mc.is_default, 
-                m.is_internal, m.is_deprecated, mc.budget_tokens, mc.reasoning_effort
+                m.is_internal, m.is_deprecated, mc.budget_tokens, mc.reasoning_effort, mc.is_pinned
          FROM model_configs mc
          JOIN models m ON mc.model_id = m.id
          WHERE mc.id = ?`,
@@ -42,6 +43,7 @@ async function getModelConfigById(id: string): Promise<ModelConfig | null> {
         isDeprecated: row.is_deprecated,
         budgetTokens: row.budget_tokens ?? undefined,
         reasoningEffort: row.reasoning_effort ?? undefined,
+        isPinned: row.is_pinned ?? false,
     };
 }
 
