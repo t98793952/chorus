@@ -485,7 +485,7 @@ export function ManageModelsBox({
         );
 
         const openaiCompatibleModels = systemModels.filter(
-            (m) => getProviderName(m.modelId) === "openai-compatible",
+            (m) => getProviderName(m.modelId) === "openai-compatible" && m.isEnabled,
         );
 
         return {
