@@ -1501,7 +1501,7 @@ function ToolsBlockView({
 
     const createJudgeEvaluation = JudgeAPI.useCreateJudgeEvaluation();
     const messageSetsQuery = MessageAPI.useMessageSets(chatId!);
-    const modelConfigsQuery = Models.useModelConfigs();
+    const modelConfigsQuery = ModelsAPI.useModelConfigs();
 
     const handleJudge = async (judgeModelId: string) => {
         if (!messageSetsQuery.data || !modelConfigsQuery.data) return;
@@ -1527,7 +1527,7 @@ function ToolsBlockView({
             : "";
         const modelResponses = toolsBlock.chatMessages.map((msg) => {
             const modelConfig = modelConfigsQuery.data.find(
-                (mc) => mc.id === msg.model,
+                (mc: Models.ModelConfig) => mc.id === msg.model,
             );
             return {
                 messageId: msg.id,
@@ -1537,10 +1537,7 @@ function ToolsBlockView({
             };
         });
 
-        const conversationHistory: Array<{
-            role: "user" | "assistant";
-            content: string;
-        }> = [];
+        const conversationHistory: Models.LLMMessage[] = [];
         const historyCount = 10;
         const messageSets = messageSetsQuery.data.slice(
             Math.max(0, messageSetsQuery.data.length - historyCount - 1),
@@ -1552,6 +1549,7 @@ function ToolsBlockView({
                 conversationHistory.push({
                     role: "user",
                     content: ms.userBlock.message.text,
+                    attachments: [],
                 });
             }
             const selectedMsg = ms.toolsBlock.chatMessages.find(
@@ -1563,6 +1561,7 @@ function ToolsBlockView({
                     content: selectedMsg.parts
                         .map((p) => p.content)
                         .join("\n"),
+                    toolCalls: [],
                 });
             }
         }

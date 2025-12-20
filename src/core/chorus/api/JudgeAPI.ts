@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../DB";
-import { simpleLLM } from "../simpleLLM";
-import { LLMMessage } from "../Models";
+import { LLMMessage, streamResponse } from "../Models";
 import { fetchModelConfigById } from "./ModelsAPI";
 import { getApiKeys, getCustomBaseUrl } from "./AppMetadataAPI";
 
@@ -69,7 +68,10 @@ function buildJudgePrompt(
         prompt += "## Conversation History\n";
         conversationHistory.forEach((msg) => {
             const role = msg.role === "user" ? "User" : "Assistant";
-            prompt += `**${role}**: ${msg.content}\n\n`;
+            const content = msg.role === "tool_results"
+                ? msg.toolResults.map(t => t.content).join("\n")
+                : msg.content;
+            prompt += `**${role}**: ${content}\n\n`;
         });
     }
 
@@ -157,16 +159,35 @@ Provide a fair, unbiased comparison and explain your reasoning.
 **Language**: Respond in the same language as the user's question unless specified otherwise.`;
 
             const modelConfig = await fetchModelConfigById(judgeModelId);
+            if (!modelConfig) {
+                throw new Error(`Model config not found: ${judgeModelId}`);
+            }
+
             const apiKeys = await getApiKeys();
             const customBaseUrl = await getCustomBaseUrl();
 
-            const judgementText = await simpleLLM(
-                modelConfig,
-                [{ role: "user", content: prompt }],
-                systemPrompt,
+            // Override system prompt for judge evaluation
+            const judgeModelConfig = {
+                ...modelConfig,
+                systemPrompt: systemPrompt,
+            };
+
+            let judgementText = "";
+            await streamResponse({
+                modelConfig: judgeModelConfig,
+                llmConversation: [
+                    { role: "user", content: prompt, attachments: [] }
+                ],
                 apiKeys,
                 customBaseUrl,
-            );
+                onChunk: (chunk) => {
+                    judgementText += chunk;
+                },
+                onComplete: async () => {},
+                onError: (error) => {
+                    throw new Error(`Judge evaluation failed: ${error}`);
+                },
+            });
 
             const evaluationId = uuidv4();
             await db.execute(
