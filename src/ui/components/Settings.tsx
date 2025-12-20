@@ -1201,7 +1201,7 @@ function InternalTaskModelSelector() {
                         <SelectGroup key={provider}>
                             <SelectLabel className="pl-2">{getProviderDisplayName(provider + "::x")}</SelectLabel>
                             {models.map((model) => (
-                                <SelectItem key={model.id} value={model.id} className="text-muted-foreground">
+                                <SelectItem key={model.id} value={model.id}>
                                     {model.displayName}
                                 </SelectItem>
                             ))}

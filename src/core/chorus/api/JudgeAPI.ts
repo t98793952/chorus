@@ -127,6 +127,7 @@ export function useCreateJudgeEvaluation() {
             conversationHistory,
             currentUserMessage,
             modelResponses,
+            onStreamChunk,
         }: {
             chatId: string;
             messageSetId: string;
@@ -139,6 +140,7 @@ export function useCreateJudgeEvaluation() {
                 modelDisplayName: string;
                 content: string;
             }>;
+            onStreamChunk?: (chunk: string) => void;
         }) => {
             const prompt = buildJudgePrompt(
                 conversationHistory,
@@ -156,7 +158,7 @@ export function useCreateJudgeEvaluation() {
 
 Provide a fair, unbiased comparison and explain your reasoning.
 
-**Language**: Respond in the same language as the user's question unless specified otherwise.`;
+**Language**: Respond in the same language as the conversation. Detect the primary language used in the conversation history and model responses, then use that language for your evaluation.`;
 
             const modelConfig = await fetchModelConfigById(judgeModelId);
             if (!modelConfig) {
@@ -182,6 +184,9 @@ Provide a fair, unbiased comparison and explain your reasoning.
                 customBaseUrl,
                 onChunk: (chunk) => {
                     judgementText += chunk;
+                    if (onStreamChunk) {
+                        onStreamChunk(chunk);
+                    }
                 },
                 onComplete: async () => {},
                 onError: (error) => {

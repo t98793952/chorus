@@ -71,6 +71,7 @@ import { Skeleton } from "./ui/skeleton";
 import { ChatInput } from "./ChatInput";
 import { useWaitForAppMetadata } from "@ui/hooks/useWaitForAppMetadata";
 import { SUMMARY_DIALOG_ID, SummaryDialog } from "./SummaryDialog";
+import { JudgeDialog } from "./JudgeDialog";
 import { FindInPage } from "./FindInPage";
 import { useEditable } from "use-editable";
 import { EditableTitle } from "./EditableTitle";
@@ -101,6 +102,7 @@ import RepliesDrawer from "./RepliesDrawer";
 import useElementScrollDetection from "@ui/hooks/useScrollDetection";
 import { checkScreenRecordingPermission } from "tauri-plugin-macos-permissions-api";
 import { dialogActions } from "@core/infra/DialogStore";
+import { judgeActions } from "@core/infra/JudgeStore";
 import { ANTHROPIC_IMPORT_PREFIX } from "@core/chorus/importers/AnthropicImporter";
 import { OPENAI_IMPORT_PREFIX } from "@core/chorus/importers/OpenAIImporter";
 import { MoveToProjectDropdown } from "./MoveToProjectDropdown";
@@ -1467,7 +1469,6 @@ export function ToolsMessageView({
 export const MANAGE_MODELS_TOOLS_DIALOG_ID = "manage-models-compare";
 export const MANAGE_MODELS_TOOLS_INLINE_DIALOG_ID =
     "manage-models-compare-inline"; // dialog for the inline add model button
-export const MANAGE_MODELS_JUDGE_DIALOG_ID = "manage-models-judge"; // dialog for judge model selection
 
 function ToolsBlockView({
     messageSetId,
@@ -1506,18 +1507,19 @@ function ToolsBlockView({
     const handleJudge = async (judgeModelId: string) => {
         if (!messageSetsQuery.data || !modelConfigsQuery.data) return;
 
+        // Start evaluation - opens dialog and resets state
+        judgeActions.startEvaluation(messageSetId);
+
         const currentMessageSet = messageSetsQuery.data.find(
             (ms) => ms.id === messageSetId,
         );
         if (!currentMessageSet) return;
 
         // Find the corresponding user message set
-        // AI message set's level is user message set's level + 1
         const userMessageSet = messageSetsQuery.data.find(
             (ms) => ms.type === "user" && ms.level === currentMessageSet.level - 1
         );
 
-        // Get user message text from the user message set
         const userMessage = userMessageSet?.userBlock.message
             ? userMessageSet.userBlock.message.parts.length > 0
                 ? userMessageSet.userBlock.message.parts
@@ -1525,6 +1527,7 @@ function ToolsBlockView({
                       .join("\n")
                 : userMessageSet.userBlock.message.text
             : "";
+
         const modelResponses = toolsBlock.chatMessages.map((msg) => {
             const modelConfig = modelConfigsQuery.data.find(
                 (mc: Models.ModelConfig) => mc.id === msg.model,
@@ -1573,6 +1576,17 @@ function ToolsBlockView({
             conversationHistory,
             currentUserMessage: userMessage,
             modelResponses,
+            onStreamChunk: (chunk) => {
+                judgeActions.appendText(chunk);
+            },
+        }, {
+            onSuccess: () => {
+                judgeActions.finishEvaluation();
+            },
+            onError: () => {
+                judgeActions.finishEvaluation();
+                toast.error("Judge evaluation failed");
+            },
         });
     };
 
@@ -1626,9 +1640,7 @@ function ToolsBlockView({
                         <button
                             className="w-14 flex-none text-sm text-muted-foreground hover:text-foreground rounded-md border-[0.090rem] py-[0.6rem] px-2 h-fit border-dashed"
                             onClick={() => {
-                                dialogActions.openDialog(
-                                    MANAGE_MODELS_JUDGE_DIALOG_ID,
-                                );
+                                judgeActions.openJudgeDialog(messageSetId, handleJudge);
                             }}
                         >
                             <div className="flex flex-col items-center gap-1 py-1">
@@ -1647,16 +1659,6 @@ function ToolsBlockView({
                                 (m) => m.model,
                             ),
                             onAddModel: handleAddModel,
-                        }}
-                    />
-
-                    {/* Judge Model dialog */}
-                    <ManageModelsBox
-                        id={MANAGE_MODELS_JUDGE_DIALOG_ID}
-                        mode={{
-                            type: "single",
-                            selectedModelConfigId: "",
-                            onSetModel: handleJudge,
                         }}
                     />
                 </div>
@@ -2709,6 +2711,8 @@ export default function MultiChat() {
                 date={chatQuery.data?.createdAt || ""}
                 onRefresh={handleRefreshSummary}
             />
+
+            <JudgeDialog />
 
             {/* Find in page UI */}
             <FindInPage dependencies={[messageSetsQuery.data]} />
