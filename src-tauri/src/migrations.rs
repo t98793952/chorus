@@ -2466,5 +2466,27 @@ You have full access to bash commands on the user''''s computer. If you write a 
                 ALTER TABLE model_configs ADD COLUMN is_pinned BOOLEAN DEFAULT 0;
             "#,
         },
+        Migration {
+            version: 133,
+            description: "create judge_evaluations tables",
+            kind: MigrationKind::Up,
+            sql: r#"
+                CREATE TABLE judge_evaluations (
+                    id TEXT PRIMARY KEY,
+                    chat_id TEXT NOT NULL,
+                    message_set_id TEXT NOT NULL,
+                    judge_model_id TEXT NOT NULL,
+                    judgement_text TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE judge_evaluated_messages (
+                    id TEXT PRIMARY KEY,
+                    judge_evaluation_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    model_id TEXT NOT NULL
+                );
+            "#,
+        },
     ];
 }

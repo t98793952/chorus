@@ -33,6 +33,7 @@ import {
     ReplyIcon,
     Trash2Icon,
     SquarePlusIcon,
+    ScaleIcon,
 } from "lucide-react";
 import { useAppContext } from "@ui/hooks/useAppContext";
 import { ChevronDownIcon, CopyIcon, CheckIcon, XIcon } from "lucide-react";
@@ -112,6 +113,7 @@ import {
 import { readFile } from "@tauri-apps/plugin-fs";
 import { filterReplyMessageSets } from "@ui/lib/replyUtils";
 import * as MessageAPI from "@core/chorus/api/MessageAPI";
+import * as JudgeAPI from "@core/chorus/api/JudgeAPI";
 import * as ChatAPI from "@core/chorus/api/ChatAPI";
 import * as ProjectAPI from "@core/chorus/api/ProjectAPI";
 import * as ModelsAPI from "@core/chorus/api/ModelsAPI";
@@ -1465,6 +1467,7 @@ export function ToolsMessageView({
 export const MANAGE_MODELS_TOOLS_DIALOG_ID = "manage-models-compare";
 export const MANAGE_MODELS_TOOLS_INLINE_DIALOG_ID =
     "manage-models-compare-inline"; // dialog for the inline add model button
+export const MANAGE_MODELS_JUDGE_DIALOG_ID = "manage-models-judge"; // dialog for judge model selection
 
 function ToolsBlockView({
     messageSetId,
@@ -1493,6 +1496,84 @@ function ToolsBlockView({
         addMessageToToolsBlock.mutate({
             messageSetId,
             modelId,
+        });
+    };
+
+    const createJudgeEvaluation = JudgeAPI.useCreateJudgeEvaluation();
+    const messageSetsQuery = MessageAPI.useMessageSets(chatId!);
+    const modelConfigsQuery = Models.useModelConfigs();
+
+    const handleJudge = async (judgeModelId: string) => {
+        if (!messageSetsQuery.data || !modelConfigsQuery.data) return;
+
+        const currentMessageSet = messageSetsQuery.data.find(
+            (ms) => ms.id === messageSetId,
+        );
+        if (!currentMessageSet) return;
+
+        // Find the corresponding user message set
+        // AI message set's level is user message set's level + 1
+        const userMessageSet = messageSetsQuery.data.find(
+            (ms) => ms.type === "user" && ms.level === currentMessageSet.level - 1
+        );
+
+        // Get user message text from the user message set
+        const userMessage = userMessageSet?.userBlock.message
+            ? userMessageSet.userBlock.message.parts.length > 0
+                ? userMessageSet.userBlock.message.parts
+                      .map((p) => p.content)
+                      .join("\n")
+                : userMessageSet.userBlock.message.text
+            : "";
+        const modelResponses = toolsBlock.chatMessages.map((msg) => {
+            const modelConfig = modelConfigsQuery.data.find(
+                (mc) => mc.id === msg.model,
+            );
+            return {
+                messageId: msg.id,
+                modelId: msg.model,
+                modelDisplayName: modelConfig?.displayName || msg.model,
+                content: msg.parts.map((p) => p.content).join("\n"),
+            };
+        });
+
+        const conversationHistory: Array<{
+            role: "user" | "assistant";
+            content: string;
+        }> = [];
+        const historyCount = 10;
+        const messageSets = messageSetsQuery.data.slice(
+            Math.max(0, messageSetsQuery.data.length - historyCount - 1),
+            messageSetsQuery.data.length - 1,
+        );
+
+        for (const ms of messageSets) {
+            if (ms.userBlock.message) {
+                conversationHistory.push({
+                    role: "user",
+                    content: ms.userBlock.message.text,
+                });
+            }
+            const selectedMsg = ms.toolsBlock.chatMessages.find(
+                (m) => m.selected,
+            );
+            if (selectedMsg) {
+                conversationHistory.push({
+                    role: "assistant",
+                    content: selectedMsg.parts
+                        .map((p) => p.content)
+                        .join("\n"),
+                });
+            }
+        }
+
+        createJudgeEvaluation.mutate({
+            chatId: chatId!,
+            messageSetId,
+            judgeModelId,
+            conversationHistory,
+            currentUserMessage: userMessage,
+            modelResponses,
         });
     };
 
@@ -1526,7 +1607,7 @@ function ToolsBlockView({
                 </div>
             ))}
             {isLastRow && !isQuickChatWindow && (
-                <div>
+                <div className="flex flex-col gap-2">
                     <button
                         // brighten border in dark mode bc it's hard to see
                         className="w-14 flex-none text-sm text-muted-foreground hover:text-foreground rounded-md border-[0.090rem] py-[0.6rem] px-2 mt-2 h-fit border-dashed"
@@ -1542,6 +1623,22 @@ function ToolsBlockView({
                         </div>
                     </button>
 
+                    {toolsBlock.chatMessages.length >= 2 && (
+                        <button
+                            className="w-14 flex-none text-sm text-muted-foreground hover:text-foreground rounded-md border-[0.090rem] py-[0.6rem] px-2 h-fit border-dashed"
+                            onClick={() => {
+                                dialogActions.openDialog(
+                                    MANAGE_MODELS_JUDGE_DIALOG_ID,
+                                );
+                            }}
+                        >
+                            <div className="flex flex-col items-center gap-1 py-1">
+                                <ScaleIcon className="font-medium w-3 h-3" />
+                                Judge
+                            </div>
+                        </button>
+                    )}
+
                     {/* Add Model dialog (can go basically anywhere, but shouldn't be inside the button) */}
                     <ManageModelsBox
                         id={MANAGE_MODELS_TOOLS_INLINE_DIALOG_ID}
@@ -1551,6 +1648,16 @@ function ToolsBlockView({
                                 (m) => m.model,
                             ),
                             onAddModel: handleAddModel,
+                        }}
+                    />
+
+                    {/* Judge Model dialog */}
+                    <ManageModelsBox
+                        id={MANAGE_MODELS_JUDGE_DIALOG_ID}
+                        mode={{
+                            type: "single",
+                            selectedModelConfigId: "",
+                            onSetModel: handleJudge,
                         }}
                     />
                 </div>
