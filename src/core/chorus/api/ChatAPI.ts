@@ -2,8 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
 import { db } from "../DB";
-import { getVersion } from "@tauri-apps/api/app";
-import { usePostHog } from "posthog-js/react";
 
 const chatKeys = {
     all: () => ["chats"] as const,
@@ -186,15 +184,14 @@ export function useUpdateNewChat() {
 }
 
 export function useCreateNewChat() {
-    const posthog = usePostHog();
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationKey: ["createNewChat"] as const,
         mutationFn: async ({ projectId }: { projectId: string }) => {
             const result = await db.select<{ id: string }[]>(
-                `INSERT INTO chats (id, created_at, updated_at, is_new_chat, project_id, quick_chat) 
-                 VALUES (lower(hex(randomblob(16))), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, ?, ?) 
+                `INSERT INTO chats (id, created_at, updated_at, is_new_chat, project_id, quick_chat)
+                 VALUES (lower(hex(randomblob(16))), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, ?, ?)
                  RETURNING id`,
                 [projectId, projectId === "quick-chat" ? 1 : 0],
             );
@@ -208,26 +205,20 @@ export function useCreateNewChat() {
             await queryClient.invalidateQueries(chatQueries.list());
 
             console.log("created new chat", chatId);
-
-            const version = await getVersion();
-            posthog?.capture("chat_created", {
-                version,
-            });
         },
     });
 }
 
 export function useCreateGroupChat() {
     const navigate = useNavigate();
-    const posthog = usePostHog();
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationKey: ["createGroupChat"] as const,
         mutationFn: async () => {
             const result = await db.select<{ id: string }[]>(
-                `INSERT INTO chats (id, created_at, updated_at, is_new_chat, project_id, gc_prototype_chat) 
-                 VALUES (lower(hex(randomblob(16))), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, 'default', 1) 
+                `INSERT INTO chats (id, created_at, updated_at, is_new_chat, project_id, gc_prototype_chat)
+                 VALUES (lower(hex(randomblob(16))), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, 'default', 1)
                  RETURNING id`,
             );
 
@@ -240,11 +231,6 @@ export function useCreateGroupChat() {
             await queryClient.invalidateQueries(chatQueries.list());
 
             console.log("created new group chat", chatId);
-
-            const version = await getVersion();
-            posthog?.capture("gc_prototype_chat_created", {
-                version,
-            });
 
             navigate(`/chat/${chatId}`);
         },

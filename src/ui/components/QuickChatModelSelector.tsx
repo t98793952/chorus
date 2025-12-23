@@ -14,7 +14,6 @@ import {
 } from "@ui/components/ui/command";
 import { getProviderName, ModelConfig } from "@core/chorus/Models";
 import { useCallback, useState } from "react";
-import { usePostHog } from "posthog-js/react";
 import { hasApiKey } from "@core/utilities/ProxyUtils";
 import { useMemo } from "react";
 import { ALLOWED_MODEL_IDS_FOR_QUICK_CHAT } from "@ui/lib/models";
@@ -32,7 +31,6 @@ export function QuickChatModelSelector({
     open,
     onOpenChange,
 }: ModelSelectorProps) {
-    const posthog = usePostHog();
     const [isOpen, setIsOpen] = useState(false);
     const { data: apiKeys } = AppMetadataAPI.useApiKeys();
 
@@ -94,11 +92,8 @@ export function QuickChatModelSelector({
     const handleModelSelect = useCallback(
         (modelId: string) => {
             onModelSelect(modelId);
-            posthog?.capture("quick_chat_model_selected", {
-                modelId,
-            });
         },
-        [onModelSelect, posthog],
+        [onModelSelect],
     );
 
     return (

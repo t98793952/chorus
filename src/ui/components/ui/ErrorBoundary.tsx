@@ -1,9 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { Button } from "./button";
-import posthog from "posthog-js";
 import FeedbackButton from "../FeedbackButton";
-import { getVersion } from "@tauri-apps/api/app";
-import { config } from "@core/config";
 
 interface Props {
     children: ReactNode;
@@ -29,19 +26,6 @@ class ErrorBoundary extends Component<Props, State> {
 
         // Save errorInfo to state so we can show it in UI
         this.setState({ errorInfo });
-
-        // don't capture errors when we're in dev mode, it's too noisy
-        if (!config.tellPostHogIAmATestUser) {
-            void getVersion().then((version) =>
-                posthog.capture("app_errored", {
-                    error_message: error.message,
-                    error_name: error.name,
-                    error_stack: error.stack,
-                    component_stack: errorInfo.componentStack,
-                    version,
-                }),
-            );
-        }
     }
 
     private handleReload = () => {

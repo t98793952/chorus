@@ -36,3 +36,6 @@ settings.local.json
 
 # husky
 !.husky/
+
+# claude
+CLAUDE.md

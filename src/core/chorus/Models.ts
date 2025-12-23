@@ -18,7 +18,6 @@ import { ProviderOllama } from "./ModelProviders/ProviderOllama";
 import { ProviderLMStudio } from "./ModelProviders/ProviderLMStudio";
 import { ProviderGrok } from "./ModelProviders/ProviderGrok";
 import { ProviderOpenAICompatible } from "./ModelProviders/ProviderOpenAICompatible";
-import posthog from "posthog-js";
 import { UserTool, UserToolCall, UserToolResult } from "./Toolsets";
 import { Attachment } from "./api/AttachmentsAPI";
 
@@ -306,11 +305,6 @@ export async function streamResponse(
         console.error(error);
         const errorMessage = getErrorMessage(error);
         void params.onError(errorMessage);
-        posthog.capture("response_errored", {
-            modelProvider: providerName,
-            modelId: params.modelConfig.modelId,
-            errorMessage,
-        });
     });
 }
 

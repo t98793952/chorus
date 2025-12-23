@@ -19,7 +19,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LLMMessage, ModelConfig } from "../Models";
 import * as Models from "../Models";
 import { UpdateQueue } from "../UpdateQueue";
-import posthog from "posthog-js";
 import { v4 as uuidv4 } from "uuid";
 import { simpleLLM } from "../simpleLLM";
 import * as Prompts from "../prompts/prompts";
@@ -740,12 +739,6 @@ export function useBranchChat({
         },
         onSuccess: async (newChatId: string) => {
             if (replyToId) {
-                posthog.capture("reply_created", {
-                    chatId,
-                    newChatId,
-                    messageId,
-                    replyToId,
-                });
                 // Navigate to the parent chat with the replyId query parameter
                 navigate(`/chat/${chatId}?replyId=${newChatId}`);
             } else {
@@ -1740,10 +1733,6 @@ export function useSelectBlock() {
             await queryClient.invalidateQueries({
                 queryKey: messageKeys.messageSets(variables.chatId),
             });
-
-            posthog?.capture("block_selected", {
-                blockType: variables.blockType,
-            });
         },
     });
 }
@@ -1820,8 +1809,6 @@ export function useStreamSynthesis() {
             if (!modelConfig) {
                 throw new Error("Synthesis model config not found");
             }
-
-            posthog.capture("synthesize_created");
 
             const result = await createMessage.mutateAsync({
                 message: createAIMessage({
@@ -1910,10 +1897,6 @@ export function useApplyRevision() {
             );
         },
         onSuccess: async (_data, variables, _context) => {
-            posthog?.capture("revision_applied", {
-                reviewer: variables.reviewMessage.model,
-            });
-
             await queryClient.invalidateQueries({
                 queryKey: messageKeys.messageSets(variables.chatId),
             });
@@ -2276,8 +2259,6 @@ export function useGenerateReviews() {
             await queryClient.invalidateQueries({
                 queryKey: messageKeys.messageSets(variables.chatId),
             });
-
-            posthog?.capture("reviews_generated");
         },
     });
 }
@@ -2437,14 +2418,6 @@ function useStreamToolsMessage() {
                     streamingToken,
                 });
                 level += 1;
-
-                // report tool call to posthog
-                streamResult.toolCalls.forEach((toolCall, _index) => {
-                    posthog?.capture("tool_called", {
-                        modelConfigId: modelConfig.id,
-                        namespacedToolName: toolCall.namespacedToolName,
-                    });
-                });
 
                 // Invalidate to ensure the UI shows the messages
                 await queryClient.invalidateQueries({
@@ -2710,11 +2683,7 @@ export function useAddMessageToToolsBlock(chatId: string) {
                 modelConfig,
             });
         },
-        onSuccess: async (_data, variables) => {
-            posthog.capture("model_config_added_to_message_set", {
-                modelConfigAdded: variables.modelId,
-            });
-
+        onSuccess: async (_data, _variables) => {
             await markProjectContextSummaryAsStale.mutateAsync({
                 chatId,
             });
@@ -2784,12 +2753,8 @@ export function useAddMessageToCompareBlock(chatId: string) {
                 messageType: "vanilla",
             });
         },
-        onSuccess: (data, variables, _context) => {
+        onSuccess: (data, _variables, _context) => {
             if (data?.skipped) return;
-
-            posthog.capture("model_config_added_to_message_set", {
-                modelConfigAdded: variables.modelId,
-            });
         },
         // no need to invalidate because it's done by the streamMessageText and createMessage
     });
@@ -2996,15 +2961,10 @@ export function useAddModelToCompareConfigs() {
 
             return { newConfigIds };
         },
-        onSuccess: async (data, variables) => {
+        onSuccess: async (data, _variables) => {
             if (data?.skipped) return;
 
             await queryClient.invalidateQueries(modelConfigQueries.compare());
-
-            posthog.capture("selected_model_configs_updated", {
-                selectedModelConfigs: data.newConfigIds as string[],
-                modelConfigAdded: variables.newSelectedModelConfigId,
-            });
         },
     });
 }

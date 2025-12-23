@@ -18,7 +18,6 @@ import { Upload, ExternalLink, FileJson, Check } from "lucide-react";
 import { cn } from "../lib/utils";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { DialogDescription } from "@radix-ui/react-dialog";
-import posthog from "posthog-js";
 import { useDialogStore } from "@core/infra/DialogStore";
 
 interface ImportChatDialogProps {
@@ -231,26 +230,14 @@ export default function ImportChatDialog({ provider }: ImportChatDialogProps) {
                 toast("Import Failed", {
                     description: `Imported ${importedCount} conversations from ${config.name}. ${failedCount} conversations failed to import.`,
                 });
-                posthog?.capture("chat_import_failed", {
-                    provider,
-                    imported_count: importedCount,
-                    failed_count: failedCount,
-                });
             } else if (failedCount === 0 && importedCount === 0) {
                 toast("Import Failed", {
                     description: `No conversations were imported from ${config.name}`,
-                });
-                posthog?.capture("chat_import_empty", {
-                    provider,
                 });
             } else {
                 setNumImported(importedCount);
                 toast.success("Import Succeeded", {
                     description: `Imported ${importedCount} conversations from ${config.name}`,
-                });
-                posthog?.capture("chat_import_succeeded", {
-                    provider,
-                    imported_count: importedCount,
                 });
             }
 
@@ -264,10 +251,6 @@ export default function ImportChatDialog({ provider }: ImportChatDialogProps) {
                     error instanceof Error
                         ? error.message
                         : "Failed to import chat history",
-            });
-            posthog?.capture("chat_import_error", {
-                provider,
-                error: error instanceof Error ? error.message : "Unknown error",
             });
             setNumImported(0);
             setImportProgress({ current: 0, total: 0 });
@@ -329,11 +312,6 @@ export default function ImportChatDialog({ provider }: ImportChatDialogProps) {
         <Dialog
             id={dialogId}
             onOpenChange={(open) => {
-                if (open) {
-                    posthog?.capture("chat_import_dialog_opened", {
-                        provider,
-                    });
-                }
                 if (!open) {
                     setIsImporting(false);
                     setNumImported(0);

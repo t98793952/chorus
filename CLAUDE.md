@@ -31,40 +31,20 @@ If I send you a URL, you MUST immediately fetch its contents and read it careful
 
 ## Workflow
 
-We use GitHub issues to track work we need to do, and PRs to review code. Whenever you create an issue or a PR, tag it with "by-claude". Use the `gh` bash command to interact with GitHub.
+Work directly on the main branch. Do not create new branches.
 
-To start working on a feature, you should:
+**IMPORTANT: Do NOT execute the following operations without explicit user request:**
+-   git commit
+-   git push
+-   Create PR
+-   Create GitHub issue
 
-1. Setup
-
--   Identify the relevant GitHub issue (or create one if needed)
--   Checkout main and pull the latest changes
--   Create a new branch like `claude/feature-name`. NEVER commit to main. NEVER push to origin/main.
-
-2. Development
-
--   Commit often as you write code, so that we can revert if needed.
--   When you have a draft of what you're working on, ask me to test it in the app to confirm that it works as you expect. Do this early and often.
-
-3. Review
-
--   When the work is done, verify that the diff looks good with `git diff main`
--   While you should attempt to write code that adheres to our coding style, don't worry about manually linting or formatting your changes. There are Husky pre-commit Git hooks that will do this for you.
--   Push the branch to GitHub
--   Open a PR.
-    -   The PR title should not include the issue number
-    -   The PR description should start with the issue number and a brief description of the changes.
-    -   Next, you should write a test plan. I (not you) will execute the test plan before merging the PR. If I can't check off any of the items, I will let you know. Make sure the test plan covers both new functionality and any EXISTING functionality that might be impacted by your changes
-
-4. Fixing issues
-
--   To reconcile different branches, always rebase or cherry-pick. Do not merge.
-
-Sometimes, after you've been working on one feature, I will ask you to start work on an unrelated feature. If I do, you should probably repeat this process from the beginning (checkout main, pull changes, create a new branch). When in doubt, just ask.
+Development flow:
+1. Modify code directly
+2. Ask user to test
+3. After user confirms, wait for user instruction before commit/push
 
 We use pnpm to manage dependencies.
-
-Don't combine git commands -- e.g., instead of `git add -A && git commit`, run `git add -A` and `git commit` separately. This will save me time because I won't have to grant you permission to run the combined command.
 
 ## Project Structure
 
