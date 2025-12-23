@@ -333,8 +333,15 @@ export async function saveModelAndDefaultConfig(
             model.isInternal ? 1 : 0,
         ],
     );
+    // Use ON CONFLICT to preserve user settings like is_pinned when refreshing models
     await db.execute(
-        "INSERT OR REPLACE INTO model_configs (id, display_name, author, model_id, system_prompt) VALUES (?, ?, ?, ?, ?)",
+        `INSERT INTO model_configs (id, display_name, author, model_id, system_prompt)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+            display_name = excluded.display_name,
+            author = excluded.author,
+            model_id = excluded.model_id,
+            system_prompt = excluded.system_prompt`,
         [model.id, modelConfigDisplayName, "system", model.id, ""],
     );
 }
