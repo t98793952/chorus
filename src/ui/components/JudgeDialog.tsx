@@ -61,8 +61,7 @@ function InlineModelSelector({
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
                 return a.displayName.localeCompare(b.displayName, undefined, { numeric: true });
-            })
-            .slice(0, 10); // Limit to 10 results
+            });
     }, [enabledModels, searchQuery]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

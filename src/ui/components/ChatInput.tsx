@@ -29,7 +29,6 @@ import {
     useFileSelect,
 } from "@ui/hooks/useAttachments";
 import { dialogActions, useDialogStore } from "@core/infra/DialogStore";
-import { ChatSuggestions } from "./ChatSuggestions";
 import { ArrowUp, ChevronDownIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { EmptyState } from "./EmptyState";
@@ -709,16 +708,6 @@ export function ChatInput({
 
                         {/* Chat input box */}
                         {defaultChatComposer}
-
-                        {/* Tip below the input */}
-                        {!isAnimatingToBottom && (
-                            <div className="mt-8">
-                                <ChatSuggestions
-                                    chatId={chatId}
-                                    inputRef={inputRef}
-                                />
-                            </div>
-                        )}
                     </div>
                 </div>
                 {!isAnimatingToBottom && <EmptyState />}

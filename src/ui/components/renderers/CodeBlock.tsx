@@ -8,6 +8,27 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import Lowlight from "react-lowlight";
 import "react-lowlight/all";
 
+// Language aliases that Lowlight supports but doesn't report in hasLanguage
+const LANGUAGE_ALIASES: Record<string, string> = {
+    html: "xml",
+    htm: "xml",
+    xhtml: "xml",
+    js: "javascript",
+    ts: "typescript",
+    py: "python",
+    rb: "ruby",
+    yml: "yaml",
+    md: "markdown",
+};
+
+const hasLanguageSupport = (lang: string): boolean => {
+    const normalizedLang = lang.toLowerCase();
+    return (
+        Lowlight.hasLanguage(normalizedLang) ||
+        Lowlight.hasLanguage(LANGUAGE_ALIASES[normalizedLang] ?? "")
+    );
+};
+
 interface CodeBlockProps {
     className?: string;
     content: string;
@@ -105,7 +126,7 @@ export const CodeBlock = React.memo(
                             p-2`}
                         ref={codeCopyRef}
                     >
-                        {Lowlight.hasLanguage(languageFromClass) ? (
+                        {hasLanguageSupport(languageFromClass) ? (
                             <Lowlight
                                 language={languageFromClass}
                                 value={contentNoFinalNewline}
@@ -166,7 +187,7 @@ export const CodeBlock = React.memo(
                                 <X className="w-3.5 h-3.5" />
                             </Button>
                         </div>
-                        {Lowlight.hasLanguage("sh") ? (
+                        {hasLanguageSupport("sh") ? (
                             <Lowlight
                                 language={"sh"}
                                 value={commandOutput}
