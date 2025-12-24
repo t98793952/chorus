@@ -2,9 +2,7 @@ import { useEffect, useState } from "react";
 import {
     Select,
     SelectContent,
-    SelectGroup,
     SelectItem,
-    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from "@ui/components/ui/select";
@@ -91,6 +89,8 @@ import * as ChatAPI from "@core/chorus/api/ChatAPI";
 import * as ModelsAPI from "@core/chorus/api/ModelsAPI";
 import { PermissionsTab } from "./PermissionsTab";
 import { cn } from "@ui/lib/utils";
+import { ProviderLogo } from "./ui/provider-logo";
+import { getProviderName } from "@core/chorus/Models";
 
 type ToolsetFormProps = {
     toolset: CustomToolsetConfig;
@@ -1140,22 +1140,6 @@ interface Settings {
     customToolsets?: CustomToolsetConfig[];
 }
 
-function getProviderDisplayName(modelId: string): string {
-    const provider = modelId.split("::")[0];
-    const names: Record<string, string> = {
-        openai: "OpenAI",
-        anthropic: "Anthropic",
-        google: "Google",
-        openrouter: "OpenRouter",
-        ollama: "Ollama",
-        lmstudio: "LM Studio",
-        grok: "Grok",
-        perplexity: "Perplexity",
-        "openai-compatible": "OpenAI Compatible",
-    };
-    return names[provider] || provider;
-}
-
 function InternalTaskModelSelector() {
     const modelConfigs = ModelsAPI.useModelConfigs();
     const { data: apiKeys } = AppMetadataAPI.useApiKeys();
@@ -1171,13 +1155,8 @@ function InternalTaskModelSelector() {
         return !!apiKeys?.[provider as keyof typeof apiKeys];
     }) || [];
 
-    // Group by provider
-    const grouped = enabledModels.reduce((acc, m) => {
-        const provider = m.modelId.split("::")[0];
-        if (!acc[provider]) acc[provider] = [];
-        acc[provider].push(m);
-        return acc;
-    }, {} as Record<string, typeof enabledModels>);
+    // Find the selected model config
+    const selectedModel = enabledModels.find((m) => m.id === internalTaskModelConfigId);
 
     return (
         <div className="pt-4">
@@ -1189,23 +1168,34 @@ function InternalTaskModelSelector() {
             </p>
             <Select
                 value={internalTaskModelConfigId || ""}
-                onValueChange={(value) => 
+                onValueChange={(value) =>
                     void setInternalTaskModelConfigId.mutateAsync(value || null)
                 }
             >
                 <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a model" />
+                    <SelectValue placeholder="Select a model">
+                        {selectedModel && (
+                            <div className="flex items-center gap-2">
+                                <ProviderLogo
+                                    provider={getProviderName(selectedModel.modelId)}
+                                    size="sm"
+                                />
+                                <span>{selectedModel.displayName}</span>
+                            </div>
+                        )}
+                    </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                    {Object.entries(grouped).map(([provider, models]) => (
-                        <SelectGroup key={provider}>
-                            <SelectLabel className="pl-2">{getProviderDisplayName(provider + "::x")}</SelectLabel>
-                            {models.map((model) => (
-                                <SelectItem key={model.id} value={model.id}>
-                                    {model.displayName}
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
+                    {enabledModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                            <div className="flex items-center gap-2">
+                                <ProviderLogo
+                                    provider={getProviderName(model.modelId)}
+                                    size="sm"
+                                />
+                                <span>{model.displayName}</span>
+                            </div>
+                        </SelectItem>
                     ))}
                 </SelectContent>
             </Select>
