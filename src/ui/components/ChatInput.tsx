@@ -39,6 +39,7 @@ import * as ModelsAPI from "@core/chorus/api/ModelsAPI";
 import * as DraftAPI from "@core/chorus/api/DraftAPI";
 import * as ModelConfigChatAPI from "@core/chorus/api/ModelConfigChatAPI";
 import * as ProjectAPI from "@core/chorus/api/ProjectAPI";
+import { EnhanceButton } from "./EnhanceButton";
 
 const DEFAULT_CHAT_INPUT_ID = "default-chat-input";
 const REPLY_CHAT_INPUT_ID = "reply-chat-input";
@@ -603,6 +604,16 @@ export function ChatInput({
                             />
                         )}
                         {!isReply && <ToolsBox />}
+                        {!isReply && (
+                            <EnhanceButton
+                                chatId={chatId}
+                                userInput={draft}
+                                onEnhanced={(enhanced) => {
+                                    setDraft(enhanced);
+                                    inputRef.current?.focus();
+                                }}
+                            />
+                        )}
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0 h-7">

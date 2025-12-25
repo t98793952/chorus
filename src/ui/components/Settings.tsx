@@ -1164,17 +1164,17 @@ function InternalTaskModelSelector() {
                 Internal Task Model
             </label>
             <p className="text-sm text-muted-foreground mb-2">
-                Model used for generating chat titles and project summaries
+                Model used for generating chat titles, project summaries, and follow-up suggestions
             </p>
             <Select
-                value={internalTaskModelConfigId || ""}
+                value={internalTaskModelConfigId || "__disabled__"}
                 onValueChange={(value) =>
-                    void setInternalTaskModelConfigId.mutateAsync(value || null)
+                    void setInternalTaskModelConfigId.mutateAsync(value === "__disabled__" ? null : value)
                 }
             >
                 <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a model">
-                        {selectedModel && (
+                        {selectedModel ? (
                             <div className="flex items-center gap-2">
                                 <ProviderLogo
                                     provider={getProviderName(selectedModel.modelId)}
@@ -1182,6 +1182,8 @@ function InternalTaskModelSelector() {
                                 />
                                 <span>{selectedModel.displayName}</span>
                             </div>
+                        ) : (
+                            <span className="text-muted-foreground">Disabled</span>
                         )}
                     </SelectValue>
                 </SelectTrigger>
@@ -1197,6 +1199,9 @@ function InternalTaskModelSelector() {
                             </div>
                         </SelectItem>
                     ))}
+                    <SelectItem value="__disabled__">
+                        <span className="text-muted-foreground">Disabled</span>
+                    </SelectItem>
                 </SelectContent>
             </Select>
         </div>
