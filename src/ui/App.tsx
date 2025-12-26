@@ -77,7 +77,6 @@ import * as AppMetadataAPI from "@core/chorus/api/AppMetadataAPI";
 import * as ToolsetsAPI from "@core/chorus/api/ToolsetsAPI";
 import * as ChatAPI from "@core/chorus/api/ChatAPI";
 import * as ProjectAPI from "@core/chorus/api/ProjectAPI";
-import { Snowfall } from "./components/Snowfall";
 
 scan({
     enabled: true,
@@ -1014,7 +1013,6 @@ function App() {
 
     return (
         <QueryClientProvider client={queryClient}>
-            <Snowfall />
             <script src="https://unpkg.com/react-scan/dist/auto.global.js"></script>
             <Router>
                 <ThemeProvider storageKey="melty-theme">
