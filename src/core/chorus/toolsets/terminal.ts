@@ -1,16 +1,4 @@
-import { MCPServer, Toolset } from "@core/chorus/Toolsets";
-import { StdioServerParameters } from "@core/chorus/MCPStdioTauri";
-
-class MCPServerDesktopCommander extends MCPServer {
-    protected getExecutionParameters(
-        _config: Record<string, string>,
-    ): StdioServerParameters {
-        return {
-            type: "sidecar",
-            sidecarBinary: "binaries/mcp-desktopcommander",
-        };
-    }
-}
+import { Toolset } from "@core/chorus/Toolsets";
 
 export class ToolsetTerminal extends Toolset {
     constructor() {
@@ -18,31 +6,11 @@ export class ToolsetTerminal extends Toolset {
             "terminal",
             "Terminal",
             {}, // No config needed
-            "Run commands in the terminal",
+            "Run commands in the terminal (DISABLED)",
         );
 
-        const desktopCommander = new MCPServerDesktopCommander();
-
-        // Add server with automatic tool registration
-        this.addServer(
-            desktopCommander,
-            {
-                mode: "select",
-                include: [
-                    "execute_command",
-                    "read_output",
-                    "force_terminate",
-                    "list_sessions",
-                    "list_processes",
-                    "kill_process",
-                ],
-            },
-            {},
-            {
-                execute_command:
-                    "Start a new session to execute a command. (Use ~ to access the user's home directory.)",
-            },
-        );
+        // Terminal toolset disabled for security reasons
+        // All shell execution capabilities have been removed
     }
 }
 

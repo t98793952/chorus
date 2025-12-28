@@ -46,7 +46,7 @@ export const CodeBlock = React.memo(
         className,
         content,
         language = undefined,
-        overrideRunCommand = false,
+        overrideRunCommand: _overrideRunCommand = false,
         contentToCopy,
     }: CodeBlockProps) => {
         if (typeof content !== "string") {
@@ -96,11 +96,8 @@ export const CodeBlock = React.memo(
         const languageFromClass =
             /language-(\w+)/.exec(className || "")?.[1] || language || "text";
 
-        const isBashCommand = ["bash", "shell", "sh"].includes(
-            languageFromClass.toLowerCase(),
-        );
-
-        const isRunnable = isBashCommand && !overrideRunCommand;
+        // Shell execution disabled for security reasons
+        const isRunnable = false;
 
         const contentNoFinalNewline = content.replace(/\n$/, "");
 
