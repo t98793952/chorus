@@ -12,10 +12,12 @@ import {
     CommandItem,
     CommandList,
 } from "@ui/components/ui/command";
-import { getProviderName } from "@core/chorus/Models";
+import { getProviderName, ModelConfig } from "@core/chorus/Models";
 import { useCallback, useState } from "react";
 import { useMemo } from "react";
 import * as ModelsAPI from "@core/chorus/api/ModelsAPI";
+import * as AppMetadataAPI from "@core/chorus/api/AppMetadataAPI";
+import { hasApiKey } from "@core/utilities/ProxyUtils";
 
 interface ModelSelectorProps {
     onModelSelect: (modelId: string) => void;
@@ -43,6 +45,40 @@ export function QuickChatModelSelector({
     const { data: selectedModelConfigQuickChat } =
         ModelsAPI.useSelectedModelConfigQuickChat();
     const modelConfigsQuery = ModelsAPI.useModelConfigs();
+    const { data: apiKeys } = AppMetadataAPI.useApiKeys();
+
+    // Check if a model has a valid API key (same logic as ManageModelsBox)
+    const hasValidApiKey = useCallback(
+        (model: ModelConfig) => {
+            const provider = getProviderName(model.modelId);
+
+            // Local models (ollama, lmstudio) don't require API keys
+            if (provider === "ollama" || provider === "lmstudio") {
+                return true;
+            }
+
+            // OpenAI-compatible requires baseUrl to be configured
+            if (provider === "openai-compatible") {
+                return !!apiKeys?.["openai-compatible-url"];
+            }
+
+            // Check if user has API key for this provider
+            if (
+                apiKeys &&
+                provider &&
+                hasApiKey(
+                    provider.toLowerCase() as keyof typeof apiKeys,
+                    apiKeys,
+                )
+            ) {
+                return true;
+            }
+
+            // No API key for this provider
+            return false;
+        },
+        [apiKeys],
+    );
 
     const quickChatSelectableModelConfigs = useMemo(
         () =>
@@ -50,9 +86,10 @@ export function QuickChatModelSelector({
                 (config) =>
                     config.isEnabled &&
                     !config.id.includes("chorus") &&
-                    !config.displayName.includes("Deprecated"),
+                    !config.displayName.includes("Deprecated") &&
+                    hasValidApiKey(config),
             ) ?? [],
-        [modelConfigsQuery],
+        [modelConfigsQuery, hasValidApiKey],
     );
 
     const handleModelSelect = useCallback(

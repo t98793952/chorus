@@ -606,7 +606,7 @@ type MessagePartWithResults = MessagePart & {
     toolCallsAndResults: ToolCallWithResult[];
 };
 
-function MessagePartView({
+const MessagePartView = memo(function MessagePartView({
     part,
     messageState,
 }: {
@@ -625,9 +625,9 @@ function MessagePartView({
             ))}
         </>
     );
-}
+});
 
-function ToolCallView({
+const ToolCallView = memo(function ToolCallView({
     toolCallWithResult,
     messageState,
 }: {
@@ -810,7 +810,7 @@ function ToolCallView({
             </TooltipContent>
         </Tooltip>
     );
-}
+});
 
 const fullscreenToolsDialogId = (messageId: string) =>
     `tools-message-fullscreen-dialog-${messageId}`;
@@ -995,55 +995,60 @@ function DeepResearchNotificationButton({ message }: { message: Message }) {
     );
 }
 
-function ToolsAIMessageViewInner({
+const ToolsAIMessageViewInner = memo(function ToolsAIMessageViewInner({
     message,
     isQuickChatWindow,
 }: {
     message: Message;
     isQuickChatWindow: boolean;
 }) {
-    // combine tool calls with tool results
-    const messagePartsSandwiched: MessagePartWithResults[] = message.parts
-        .map((part, index) => {
-            if (part.toolResults) {
-                return undefined; // skip it
-            }
-            if (!part.toolCalls) {
+    // combine tool calls with tool results - memoize this expensive computation
+    const messagePartsSandwiched = useMemo(() => {
+        return message.parts
+            .map((part, index) => {
+                if (part.toolResults) {
+                    return undefined; // skip it
+                }
+                if (!part.toolCalls) {
+                    return {
+                        ...part,
+                        toolCallsAndResults: [],
+                    };
+                }
+
+                const toolCalls = part.toolCalls;
+                const toolResults = message.parts[index + 1]?.toolResults ?? [];
+
+                // note that in using zip, we assume the tool calls order corresponds to the tool results order
+                // this is safe for now but safer still would be to match them up by id
+                const toolCallsAndResults: ToolCallWithResult[] = _.zipWith(
+                    toolCalls,
+                    toolResults,
+                    (
+                        toolCall: UserToolCall,
+                        toolResult: UserToolResult | undefined,
+                    ): ToolCallWithResult => ({
+                        ...toolCall,
+                        toolResult,
+                    }),
+                );
                 return {
                     ...part,
-                    toolCallsAndResults: [],
+                    toolCallsAndResults: toolCallsAndResults,
                 };
-            }
+            })
+            .filter((p): p is MessagePartWithResults => p !== undefined);
+    }, [message.parts]);
 
-            const toolCalls = part.toolCalls;
-            const toolResults = message.parts[index + 1]?.toolResults ?? [];
+    const isStreaming = message.state === "streaming";
 
-            // note that in using zip, we assume the tool calls order corresponds to the tool results order
-            // this is safe for now but safer still would be to match them up by id
-            const toolCallsAndResults: ToolCallWithResult[] = _.zipWith(
-                toolCalls,
-                toolResults,
-                (
-                    toolCall: UserToolCall,
-                    toolResult: UserToolResult | undefined,
-                ): ToolCallWithResult => ({
-                    ...toolCall,
-                    toolResult,
-                }),
-            );
-            return {
-                ...part,
-                toolCallsAndResults: toolCallsAndResults,
-            };
-        })
-        .filter((p) => p !== undefined);
     return (
         <div
             className={`relative overflow-y-auto select-text ${
                 isQuickChatWindow
                     ? "py-2.5 border !border-special max-w-full inline-block break-words px-3.5 rounded-xl"
                     : "p-4 pb-6"
-            }`}
+            } ${isStreaming ? "streaming-content" : ""}`}
         >
             {(message.parts.length === 0 ||
                 _.every(message.parts.map((p) => !p.content))) &&
@@ -1083,7 +1088,7 @@ function ToolsAIMessageViewInner({
                                 // )} */}
         </div>
     );
-}
+});
 
 export function ToolsReplyCountView({
     replyChatId,
@@ -1125,7 +1130,7 @@ export function ToolsReplyCountView({
     );
 }
 
-export function ToolsMessageView({
+export function ToolsMessageViewInner({
     message,
     isQuickChatWindow,
     isLastRow,
@@ -1465,6 +1470,8 @@ export function ToolsMessageView({
         </div>
     );
 }
+
+export const ToolsMessageView = memo(ToolsMessageViewInner);
 
 export const MANAGE_MODELS_TOOLS_DIALOG_ID = "manage-models-compare";
 export const MANAGE_MODELS_TOOLS_INLINE_DIALOG_ID =

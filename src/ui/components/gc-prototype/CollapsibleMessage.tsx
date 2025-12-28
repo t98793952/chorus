@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "../ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { MessageMarkdown } from "../renderers/MessageMarkdown";
 
 // Component for collapsible message content
 export function CollapsibleMessage({ text }: { text: string }) {
@@ -19,12 +20,12 @@ export function CollapsibleMessage({ text }: { text: string }) {
         <div className="relative">
             <div
                 ref={contentRef}
-                className={`text-sm whitespace-pre-wrap select-text overflow-hidden transition-all duration-200 ${
+                className={`text-sm select-text overflow-hidden transition-all duration-200 ${
                     isExpanded ? "" : "max-h-[100px]"
                 }`}
                 style={{ position: "relative" }}
             >
-                {text}
+                <MessageMarkdown text={text} />
                 {/* Gradient overlay when collapsed and needs expansion */}
                 {!isExpanded && needsExpansion && (
                     <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-background to-transparent pointer-events-none" />

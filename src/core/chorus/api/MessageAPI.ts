@@ -1051,12 +1051,21 @@ export function useStreamMessagePart() {
                 );
             };
 
+            // Throttle cache updates to reduce re-renders during streaming
+            const throttledUpdateCache = _.throttle(
+                (text: string, token: string) => {
+                    updateMessagePartInCache(text, token);
+                },
+                50,
+                { leading: true, trailing: true },
+            );
+
             const onChunk = (chunk: string) => {
                 partialResponse += chunk;
                 priority += 1;
 
-                // optimistic update
-                updateMessagePartInCache(partialResponse, streamingToken);
+                // optimistic update (throttled to reduce re-renders)
+                throttledUpdateCache(partialResponse, streamingToken);
 
                 UpdateQueue.getInstance().addUpdate(
                     streamKey,
@@ -1096,6 +1105,8 @@ export function useStreamMessagePart() {
                 // one we've been accumulating
                 finalText = finalText ?? partialResponse;
 
+                // Cancel any pending throttled updates and flush final state
+                throttledUpdateCache.cancel();
                 // optimistic update
                 updateMessagePartInCache(finalText, streamingToken);
 
@@ -1143,6 +1154,8 @@ export function useStreamMessagePart() {
                     errorMessage,
                 );
 
+                // Cancel any pending throttled updates
+                throttledUpdateCache.cancel();
                 UpdateQueue.getInstance().closeUpdateStream(streamKey);
                 resolveStreamPromise({ result: "error", errorMessage });
             };
@@ -1277,12 +1290,21 @@ export function useStreamMessageLegacy() {
                 );
             };
 
+            // Throttle cache updates to reduce re-renders during streaming
+            const throttledOptimisticUpdate = _.throttle(
+                (msgId: string, text: string, token: string) => {
+                    optimisticUpdateMessageText(msgId, text, token);
+                },
+                50,
+                { leading: true, trailing: true },
+            );
+
             const onChunk = (chunk: string) => {
                 partialResponse += chunk;
                 priority += 1;
 
-                // optimistic update
-                optimisticUpdateMessageText(
+                // optimistic update (throttled to reduce re-renders)
+                throttledOptimisticUpdate(
                     messageId,
                     partialResponse,
                     streamingToken,
@@ -1310,6 +1332,8 @@ export function useStreamMessageLegacy() {
                 // one we've been accumulating
                 finalText = finalText ?? partialResponse;
 
+                // Cancel any pending throttled updates and flush final state
+                throttledOptimisticUpdate.cancel();
                 // optimistic update
                 optimisticUpdateMessageText(
                     messageId,
@@ -1340,6 +1364,8 @@ export function useStreamMessageLegacy() {
                     "streaming error (will be saved in db)",
                     errorMessage,
                 );
+                // Cancel any pending throttled updates
+                throttledOptimisticUpdate.cancel();
                 await db.execute(
                     `UPDATE messages
                     SET streaming_token = NULL, state = 'idle', error_message = $1

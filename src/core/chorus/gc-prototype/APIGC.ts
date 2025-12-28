@@ -16,7 +16,7 @@ import {
 
 // Command detection utilities
 export function containsConductCommand(text: string): boolean {
-    return text.includes("/conduct");
+    return text.toLowerCase().includes("@conduct");
 }
 
 export function containsYieldCommand(text: string): boolean {
@@ -175,42 +175,6 @@ export async function orchestrateConductorSession({
             scopeId,
         );
 
-        // Check for /yield command
-        if (containsYieldCommand(responseText)) {
-            console.log("[Conductor] Conductor yielded control");
-            // Clear conductor and exit
-            await gcdb.clearConductor(chatId, scopeId);
-
-            // Save conductor response with yield
-            const messageId = uuidv4().toLowerCase();
-            await gcdb.insertGCMessage(
-                chatId,
-                messageId,
-                responseText,
-                conductorModelId,
-                scopeId,
-            );
-
-            // Invalidate queries
-            await queryClient.invalidateQueries({
-                queryKey: ["gcMessages", chatId],
-            });
-            await queryClient.invalidateQueries({
-                queryKey: ["gcMainMessages", chatId],
-            });
-            await queryClient.invalidateQueries({
-                queryKey: ["gcThreadMessages", chatId],
-            });
-            await queryClient.invalidateQueries({
-                queryKey: ["gcConductor", chatId, scopeId ?? null],
-            });
-
-            if (onConductorComplete) {
-                onConductorComplete();
-            }
-            return;
-        }
-
         // Save conductor response
         const messageId = uuidv4().toLowerCase();
         await gcdb.insertGCMessage(
@@ -232,7 +196,7 @@ export async function orchestrateConductorSession({
             queryKey: ["gcThreadMessages", chatId],
         });
 
-        // Check if conductor mentioned any models
+        // Check if conductor mentioned any models - process @mentions BEFORE checking /yield
         const { models } = await getRespondingModels(responseText);
         console.log("[Conductor] Models mentioned by conductor:", models);
 
@@ -288,6 +252,21 @@ export async function orchestrateConductorSession({
             });
         }
 
+        // Check for /yield command AFTER processing @mentions
+        if (containsYieldCommand(responseText)) {
+            console.log("[Conductor] Conductor yielded control");
+            // Clear conductor and exit
+            await gcdb.clearConductor(chatId, scopeId);
+            await queryClient.invalidateQueries({
+                queryKey: ["gcConductor", chatId, scopeId ?? null],
+            });
+
+            if (onConductorComplete) {
+                onConductorComplete();
+            }
+            return;
+        }
+
         // Check if we hit the turn limit
         if (turnCount >= 10) {
             await gcdb.clearConductor(chatId, scopeId);
@@ -295,6 +274,16 @@ export async function orchestrateConductorSession({
                 queryKey: ["gcConductor", chatId, scopeId ?? null],
             });
 
+            if (onConductorComplete) {
+                onConductorComplete();
+            }
+            return;
+        }
+
+        // Check if conductor was cancelled before continuing
+        const stillActive = await gcdb.fetchActiveConductor(chatId, scopeId);
+        if (!stillActive || stillActive.conductorModelId !== conductorModelId) {
+            console.log("[Conductor] Conductor was cancelled, stopping");
             if (onConductorComplete) {
                 onConductorComplete();
             }
@@ -567,34 +556,28 @@ export async function encodeConversation(
  * Handles can map to a single model ID (string) or multiple model IDs (array)
  */
 export const MODEL_HANDLE_MAP: Record<string, string | string[]> = {
-    // Claude models
-    claude: "anthropic::claude-sonnet-4-latest",
-    sonnet: "anthropic::claude-sonnet-4-latest",
-    opus: "anthropic::claude-opus-4-latest",
+    // Claude (Opus 4.5) - via OpenAI-Compatible endpoint
+    claude: "openai-compatible::claude-opus-4-5",
 
-    // Gemini models
-    gemini: "google::gemini-2.5-pro-latest",
-    flash: "google::gemini-2.5-flash-preview-04-17",
+    // Gemini models - via OpenAI-Compatible endpoint
+    gemini: "openai-compatible::gemini-3-pro",
+    flash: "openai-compatible::gemini-3-flash",
 
-    // OpenAI models
-    "41": "openai::gpt-4.1",
-    o3: "openai::o3",
-    o3pro: "openai::o3-pro",
+    // OpenAI (GPT-5.2) - via OpenAI-Compatible endpoint
+    gpt: "openai-compatible::gpt-5.2",
 
-    // Legacy handles for backward compatibility
-    "4o": "openai::gpt-4o",
-    "4.1": "openai::gpt-4.1",
-
-    // Multi-model handles
+    // Multi-model handles (all 4 flagship models)
     brainstorm: [
-        "google::gemini-2.5-flash-preview-04-17",
-        "anthropic::claude-sonnet-4-latest",
-        "openai::gpt-4.1",
+        "openai-compatible::claude-opus-4-5",
+        "openai-compatible::gemini-3-flash",
+        "openai-compatible::gemini-3-pro",
+        "openai-compatible::gpt-5.2",
     ],
     think: [
-        "openai::o3-pro",
-        "anthropic::claude-opus-4-latest",
-        "google::gemini-2.5-pro-latest",
+        "openai-compatible::claude-opus-4-5",
+        "openai-compatible::gemini-3-flash",
+        "openai-compatible::gemini-3-pro",
+        "openai-compatible::gpt-5.2",
     ],
 };
 
@@ -663,7 +646,7 @@ async function generateResponseWithStreamAPI(
 
 /**
  * Generates a response from an AI model for the group chat
- * @param modelId - The model ID (e.g., "openai::gpt-4.1")
+ * @param modelId - The model ID (e.g., "openai-compatible::claude-opus-4-5")
  * @param conversation - The encoded conversation from the model's POV
  * @param chatId - The chat ID for tracking thinking state
  * @param scopeId - Optional scope ID (thread root message ID) for tracking thinking state
@@ -714,8 +697,8 @@ async function getRespondingModels(text: string): Promise<{
     models: Array<{ id: string; name: string }>;
     multiplier: number;
 }> {
-    // Default model for group chat (Claude Sonnet)
-    const defaultModelId = "anthropic::claude-sonnet-4-latest";
+    // Default model for group chat (Claude Opus via OpenAI-Compatible)
+    const defaultModelId = "openai-compatible::claude-opus-4-5";
 
     // Extract multiplier
     const multiplier = extractMultiplier(text);
@@ -727,18 +710,28 @@ async function getRespondingModels(text: string): Promise<{
         return { models: [], multiplier };
     }
 
-    // Check for model handles in the text
+    // Check for model handles in the text - preserve order of appearance
     const mentionedModelIds: string[] = [];
     const lowerText = text.toLowerCase();
 
+    // Find all @mentions with their positions
+    const mentions: { handle: string; position: number; modelIds: string | string[] }[] = [];
     for (const [handle, modelIdOrIds] of Object.entries(MODEL_HANDLE_MAP)) {
-        if (lowerText.includes(`@${handle}`)) {
-            // Handle can map to a single model or multiple models
-            if (Array.isArray(modelIdOrIds)) {
-                mentionedModelIds.push(...modelIdOrIds);
-            } else {
-                mentionedModelIds.push(modelIdOrIds);
-            }
+        const pos = lowerText.indexOf(`@${handle}`);
+        if (pos !== -1) {
+            mentions.push({ handle, position: pos, modelIds: modelIdOrIds });
+        }
+    }
+
+    // Sort by position in text (user's input order)
+    mentions.sort((a, b) => a.position - b.position);
+
+    // Add model IDs in order of appearance
+    for (const mention of mentions) {
+        if (Array.isArray(mention.modelIds)) {
+            mentionedModelIds.push(...mention.modelIds);
+        } else {
+            mentionedModelIds.push(mention.modelIds);
         }
     }
 
@@ -753,7 +746,7 @@ async function getRespondingModels(text: string): Promise<{
             .filter((m): m is { id: string; name: string } => m !== null);
     } else {
         // Default: only the default model responds
-        models = [{ id: defaultModelId, name: "Claude Sonnet" }];
+        models = [{ id: defaultModelId, name: "Claude Opus" }];
     }
 
     return { models, multiplier };

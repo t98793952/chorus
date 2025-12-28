@@ -8,6 +8,7 @@ import {
     useRestoreGCMessage,
     useGCThreadCounts,
     useGCConductor,
+    useClearConductor,
 } from "@core/chorus/gc-prototype/APIGC";
 import {
     Users,
@@ -18,8 +19,9 @@ import {
     MessageSquare,
     ArrowUpToLine,
     TriangleAlert,
+    Square,
 } from "lucide-react";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Button } from "../ui/button";
 import { convertDate, displayDate } from "@ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -30,6 +32,16 @@ import {
     getModelDisplayName,
     getModelAvatar,
 } from "@core/chorus/gc-prototype/UtilsGC";
+
+// @ mention options for autocomplete
+const MENTION_OPTIONS = [
+    { handle: "conduct", label: "Conductor Mode", description: "Let AI orchestrate the conversation" },
+    { handle: "claude", label: "Claude", description: "Claude Opus 4.5" },
+    { handle: "gemini", label: "Gemini", description: "Gemini 3 Pro" },
+    { handle: "flash", label: "Flash", description: "Gemini 3 Flash" },
+    { handle: "gpt", label: "GPT", description: "GPT-5.2" },
+    { handle: "brainstorm", label: "Brainstorm", description: "All 4 models respond" },
+];
 
 // Type for tracking individual model instances
 type ModelInstance = {
@@ -116,6 +128,7 @@ export default function GroupChat() {
     const generateAIResponses = useGenerateAIResponses();
     const deleteMessage = useDeleteGCMessage();
     const restoreMessage = useRestoreGCMessage();
+    const clearConductor = useClearConductor();
     const [input, setInput] = useState("");
     const [generatingModels, setGeneratingModels] = useState<
         Map<string, number>
@@ -124,6 +137,122 @@ export default function GroupChat() {
         string | null
     >(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // @ mention autocomplete state
+    const [showMentionPopup, setShowMentionPopup] = useState(false);
+    const [mentionFilter, setMentionFilter] = useState("");
+    const [mentionStartPos, setMentionStartPos] = useState(0);
+    const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+
+    // Filter mention options based on input
+    const filteredMentions = useMemo(() => {
+        if (!mentionFilter) return MENTION_OPTIONS;
+        const lower = mentionFilter.toLowerCase();
+        return MENTION_OPTIONS.filter(
+            (opt) =>
+                opt.handle.toLowerCase().includes(lower) ||
+                opt.label.toLowerCase().includes(lower)
+        );
+    }, [mentionFilter]);
+
+    // Handle input change with @ detection
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value;
+        const cursorPos = e.target.selectionStart || 0;
+        setInput(value);
+
+        // Check if we just typed @ or are in the middle of typing a mention
+        const textBeforeCursor = value.slice(0, cursorPos);
+        const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+
+        if (lastAtIndex !== -1) {
+            const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1);
+            // Only show popup if there's no space after @ (still typing the mention)
+            if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+                setShowMentionPopup(true);
+                setMentionFilter(textAfterAt);
+                setMentionStartPos(lastAtIndex);
+                setSelectedMentionIndex(0);
+                return;
+            }
+        }
+
+        setShowMentionPopup(false);
+        setMentionFilter("");
+    }, []);
+
+    // Insert selected mention
+    const insertMention = useCallback((handle: string) => {
+        const before = input.slice(0, mentionStartPos);
+        const after = input.slice(mentionStartPos + mentionFilter.length + 1); // +1 for @
+        const newValue = `${before}@${handle} ${after}`;
+        setInput(newValue);
+        setShowMentionPopup(false);
+        setMentionFilter("");
+
+        // Focus back on textarea
+        requestAnimationFrame(() => {
+            if (textareaRef.current) {
+                textareaRef.current.focus();
+                const newCursorPos = mentionStartPos + handle.length + 2; // @ + handle + space
+                textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+        });
+    }, [input, mentionStartPos, mentionFilter]);
+
+    // Handle send message - defined before handleKeyDown since it's used there
+    const handleSend = useCallback(async () => {
+        if (!input.trim() || !chatId) return;
+
+        const userMessage = input.trim();
+
+        // Use the user model config
+        await sendMessage.mutateAsync({
+            chatId,
+            text: userMessage,
+            modelConfigId: "user",
+        });
+
+        setInput("");
+
+        // Trigger AI responses - thinking states are now tracked centrally
+        generateAIResponses.mutate({
+            chatId,
+            userMessage,
+        });
+    }, [input, chatId, sendMessage, generateAIResponses]);
+
+    // Handle keyboard navigation in mention popup
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (showMentionPopup && filteredMentions.length > 0) {
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setSelectedMentionIndex((prev) =>
+                    prev < filteredMentions.length - 1 ? prev + 1 : 0
+                );
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setSelectedMentionIndex((prev) =>
+                    prev > 0 ? prev - 1 : filteredMentions.length - 1
+                );
+            } else if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                insertMention(filteredMentions[selectedMentionIndex].handle);
+            } else if (e.key === "Escape") {
+                e.preventDefault();
+                setShowMentionPopup(false);
+            }
+        } else if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            void handleSend();
+        }
+    }, [showMentionPopup, filteredMentions, selectedMentionIndex, insertMention, handleSend]);
+
+    // Auto-focus textarea on mount
+    useEffect(() => {
+        textareaRef.current?.focus();
+    }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -184,34 +313,6 @@ export default function GroupChat() {
         return instances;
     }, [generatingModels]);
 
-    const handleSend = async () => {
-        if (!input.trim() || !chatId) return;
-
-        const userMessage = input.trim();
-
-        // Use the user model config
-        await sendMessage.mutateAsync({
-            chatId,
-            text: userMessage,
-            modelConfigId: "user",
-        });
-
-        setInput("");
-
-        // Trigger AI responses - thinking states are now tracked centrally
-        generateAIResponses.mutate({
-            chatId,
-            userMessage,
-        });
-    };
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            void handleSend();
-        }
-    };
-
     if (!messages || messages.length === 0) {
         return (
             <div className="flex flex-col h-screen w-full">
@@ -232,12 +333,31 @@ export default function GroupChat() {
                     </div>
                 </div>
 
-                <div className="border-t p-4">
+                <div className="border-t p-4 relative">
+                    {/* @ Mention Popup */}
+                    {showMentionPopup && filteredMentions.length > 0 && (
+                        <div className="absolute bottom-full left-4 right-4 mb-2 bg-popover border rounded-lg shadow-lg overflow-hidden z-50">
+                            {filteredMentions.map((option, index) => (
+                                <button
+                                    key={option.handle}
+                                    className={`w-full px-3 py-2 text-left flex items-center gap-3 ${
+                                        index === selectedMentionIndex ? "bg-muted" : "hover:bg-muted/50"
+                                    }`}
+                                    onClick={() => insertMention(option.handle)}
+                                    onMouseEnter={() => setSelectedMentionIndex(index)}
+                                >
+                                    <span className="font-medium text-sm">@{option.handle}</span>
+                                    <span className="text-xs text-muted-foreground">{option.description}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <textarea
+                        ref={textareaRef}
                         value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type a message..."
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type @ to mention models..."
                         className="w-full min-h-[60px] px-4 py-3 rounded-lg border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                         rows={2}
                     />
@@ -641,23 +761,55 @@ export default function GroupChat() {
                     <div className="px-4 py-2 bg-secondary/50 border-t">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>
+                            <span className="flex-1">
                                 {getModelDisplayName(
                                     conductor.conductorModelId,
                                 )}{" "}
                                 is conducting.
                             </span>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2"
+                                onClick={() => {
+                                    if (chatId) {
+                                        clearConductor.mutate({ chatId });
+                                    }
+                                }}
+                            >
+                                <Square className="h-3 w-3 mr-1" />
+                                Stop
+                            </Button>
                         </div>
                     </div>
                 )}
 
                 {/* Input */}
-                <div className="border-t p-4">
+                <div className="border-t p-4 relative">
+                    {/* @ Mention Popup */}
+                    {showMentionPopup && filteredMentions.length > 0 && (
+                        <div className="absolute bottom-full left-4 right-4 mb-2 bg-popover border rounded-lg shadow-lg overflow-hidden z-50">
+                            {filteredMentions.map((option, index) => (
+                                <button
+                                    key={option.handle}
+                                    className={`w-full px-3 py-2 text-left flex items-center gap-3 ${
+                                        index === selectedMentionIndex ? "bg-muted" : "hover:bg-muted/50"
+                                    }`}
+                                    onClick={() => insertMention(option.handle)}
+                                    onMouseEnter={() => setSelectedMentionIndex(index)}
+                                >
+                                    <span className="font-medium text-sm">@{option.handle}</span>
+                                    <span className="text-xs text-muted-foreground">{option.description}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <textarea
+                        ref={textareaRef}
                         value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type a message..."
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type @ to mention models..."
                         className="w-full min-h-[60px] px-4 py-3 rounded-lg border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                         rows={2}
                     />
