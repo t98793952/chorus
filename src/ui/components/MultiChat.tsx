@@ -10,9 +10,7 @@ import { toast } from "sonner";
 import { Button } from "./ui/button";
 import {
     FileTextIcon,
-    ExternalLinkIcon,
     PictureInPicture2Icon,
-    ShareIcon,
     CircleAlertIcon,
     SplitIcon,
     SquarePen,
@@ -31,12 +29,11 @@ import {
     ChevronRightIcon,
     FolderOpenIcon,
     ReplyIcon,
-    Trash2Icon,
     SquarePlusIcon,
     ScaleIcon,
 } from "lucide-react";
 import { useAppContext } from "@ui/hooks/useAppContext";
-import { ChevronDownIcon, CopyIcon, CheckIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, CheckIcon, XIcon } from "lucide-react";
 import RetroSpinner from "./ui/retro-spinner";
 import { TooltipContent } from "./ui/tooltip";
 import { Tooltip } from "./ui/tooltip";
@@ -50,8 +47,6 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
-    DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from "./ui/dialog";
@@ -66,7 +61,6 @@ import {
     ToolsBlock,
     MessagePart,
 } from "@core/chorus/ChatState";
-import { useShareChat } from "@ui/hooks/useShareChat";
 import { Skeleton } from "./ui/skeleton";
 import { ChatInput } from "./ChatInput";
 import { useWaitForAppMetadata } from "@ui/hooks/useWaitForAppMetadata";
@@ -94,7 +88,6 @@ import { CodeBlock } from "./renderers/CodeBlock";
 import * as Toolsets from "@core/chorus/Toolsets";
 import { SidebarTrigger } from "@ui/components/ui/sidebar";
 import { useSidebar } from "@ui/hooks/useSidebar";
-import { useShortcut } from "@ui/hooks/useShortcut";
 import { projectDisplayName, sendTauriNotification } from "@ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { ManageModelsBox } from "./ManageModelsBox";
@@ -1819,8 +1812,6 @@ function ModelSelectorWrapper() {
     return <QuickChatModelSelector onModelSelect={handleModelSelect} />;
 }
 
-export const SHARE_CHAT_DIALOG_ID = "share-chat-dialog";
-
 export default function MultiChat() {
     const { chatId } = useParams();
     const chatQuery = ChatAPI.useChat(chatId!);
@@ -1998,64 +1989,9 @@ export default function MultiChat() {
 
     const eyeRef = useRef<MouseTrackingEyeRef>(null);
 
-    const {
-        isGeneratingShareLink,
-        shareUrl,
-        copiedUrl,
-        doShareChat,
-        handleCopyShareUrl,
-        handleOpenShareUrl,
-        handleDeleteShare,
-        setShareUrl,
-    } = useShareChat(chatId!);
-
-    // Share dialog shortcuts
-    useShortcut(
-        ["enter"],
-        () => {
-            if (shareUrl) {
-                void handleCopyShareUrl();
-            }
-        },
-        {
-            enableOnDialogIds: [SHARE_CHAT_DIALOG_ID],
-            enableOnChatFocus: false,
-        },
-    );
-
-    useShortcut(
-        ["meta", "enter"],
-        () => {
-            if (shareUrl) {
-                void handleOpenShareUrl();
-            }
-        },
-        {
-            enableOnDialogIds: [SHARE_CHAT_DIALOG_ID],
-        },
-    );
-
-    useShortcut(
-        ["escape"],
-        () => {
-            setShareUrl(null);
-        },
-        {
-            enableOnDialogIds: [SHARE_CHAT_DIALOG_ID],
-        },
-    );
-
     const summarizeChat = MessageAPI.useSummarizeChat();
     const [summary, setSummary] = useState<string | null>(null);
     const [isSummarizing, setIsSummarizing] = useState(false);
-
-    useEffect(() => {
-        if (!shareUrl) {
-            dialogActions.closeDialog();
-        } else {
-            dialogActions.openDialog(SHARE_CHAT_DIALOG_ID);
-        }
-    }, [shareUrl]);
 
     const handleSummarizeChat = useCallback(async () => {
         setIsSummarizing(true);
@@ -2082,17 +2018,6 @@ export default function MultiChat() {
         }
     }, [chatId, summarizeChat]);
 
-    const handleShareChat = useCallback(async () => {
-        // Get the main chat container's HTML
-        const chatContainer = document.querySelector(".max-w-10xl");
-        if (!chatContainer) {
-            console.error("Chat container not found");
-            return;
-        }
-
-        await doShareChat(chatContainer.outerHTML);
-    }, [doShareChat]);
-
     const selectMessage = MessageAPI.useSelectMessage();
     const selectSynthesis = MessageAPI.useSelectSynthesis();
     const setReviewsEnabled = MessageAPI.useSetReviewsEnabled();
@@ -2108,9 +2033,6 @@ export default function MultiChat() {
     //         });
     //     }
     // }
-
-    // useShortcut(["tab"], () => handleTabKey(false));
-    // useShortcut(["shift", "tab"], () => handleTabKey(true));
 
     const handleToggleVisionMode = useCallback(async () => {
         const hasPermissions = await checkScreenRecordingPermission();
@@ -2171,19 +2093,6 @@ export default function MultiChat() {
                     chatId: chatId!,
                     messageSetId: currentMessageSet.id,
                 });
-            } else if (e.metaKey && e.shiftKey && e.key.toLowerCase() === "s") {
-                e.preventDefault();
-                try {
-                    await handleShareChat();
-                } catch (error) {
-                    console.error(
-                        "Error generating/copying share link:",
-                        error,
-                    );
-                    toast.error("Error", {
-                        description: "Failed to generate or copy share link",
-                    });
-                }
             } else if (e.metaKey && e.shiftKey && e.key === "r") {
                 e.preventDefault();
                 setReviewsEnabled.mutate({
@@ -2213,7 +2122,6 @@ export default function MultiChat() {
         currentMessageSet,
         currentCompareBlock,
         isQuickChatWindow,
-        handleShareChat,
         handleOpenQuickChatInMainWindow,
         appMetadata,
         selectMessage,
@@ -2533,31 +2441,6 @@ export default function MultiChat() {
                                             Summarize
                                         </TooltipContent>
                                     </Tooltip>
-
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="iconSm"
-                                                className="px-2 text-accent-foreground hover:text-foreground"
-                                                tabIndex={-1}
-                                                onClick={handleShareChat}
-                                                disabled={isGeneratingShareLink}
-                                            >
-                                                {isGeneratingShareLink ? (
-                                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                                ) : (
-                                                    <ShareIcon
-                                                        strokeWidth={1.5}
-                                                        className="!size-3.5"
-                                                    />
-                                                )}
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            Share (⌘⇧S)
-                                        </TooltipContent>
-                                    </Tooltip>
                                 </>
                             )}
 
@@ -2648,69 +2531,6 @@ export default function MultiChat() {
                     </div>
                 )}
             </div>
-
-            <Dialog
-                id={SHARE_CHAT_DIALOG_ID}
-                onOpenChange={(open) => !open && setShareUrl(null)}
-            >
-                <DialogContent className="p-5">
-                    <DialogHeader>
-                        <DialogTitle>Share Chat</DialogTitle>
-                        <DialogDescription className="space-y-4">
-                            <div className="flex items-center gap-2 mt-2">
-                                <CircleAlertIcon className="h-4 w-4 flex-shrink-0" />
-                                <p className="text-sm">
-                                    Anyone with this link can view your chat.
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => void handleCopyShareUrl()}
-                                className="text-left focus:outline-none border text-sm hover:bg-muted/50 rounded-md p-2 w-full"
-                                autoFocus
-                            >
-                                <code>{shareUrl}</code>
-                            </button>
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="flex-col gap-2 sm:flex-row">
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => void handleDeleteShare()}
-                            className="sm:mr-auto"
-                        >
-                            <Trash2Icon className="w-4 h-4" />
-                            Delete Link
-                        </Button>
-                        <div className="flex gap-2 w-full sm:w-auto">
-                            <Button
-                                size="sm"
-                                onClick={() => void handleCopyShareUrl()}
-                                className="flex-1 sm:flex-initial"
-                            >
-                                {copiedUrl ? (
-                                    <CheckIcon className="w-4 h-4 text-green-500" />
-                                ) : (
-                                    <CopyIcon className="w-4 h-4" />
-                                )}
-                                <span className="ml-1">
-                                    {copiedUrl ? "Copied" : "Copy"}
-                                </span>
-                                <span className="ml-1 text-sm">↵</span>
-                            </Button>
-                            <Button
-                                size="sm"
-                                onClick={() => void handleOpenShareUrl()}
-                                className="flex-1 sm:flex-initial"
-                            >
-                                <ExternalLinkIcon className="w-4 h-4" />
-                                <span className="ml-1">Open</span>
-                                <span className="ml-1 text-sm">⌘↵</span>
-                            </Button>
-                        </div>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
             <SummaryDialog
                 summary={summary || ""}

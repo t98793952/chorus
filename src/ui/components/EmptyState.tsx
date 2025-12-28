@@ -13,7 +13,6 @@ const getTips = (quickChatShortcut: string) => [
         content:
             "Drag and drop images, documents, or other files into the chat.",
     },
-    { content: "Press ⌘⇧S to share your chat as a web page." },
     { content: "Toggle the sidebar with ⌘B." },
     { content: "Open settings with ⌘," },
     { content: "Press ⌘T to give models access to tools." },
