@@ -1,5 +1,4 @@
 import {
-    ArchiveIcon,
     ChevronDownIcon,
     Settings,
     PlusIcon,
@@ -39,7 +38,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button } from "./ui/button";
 import { EditableTitle } from "./EditableTitle";
 import { type Chat } from "@core/chorus/api/ChatAPI";
-import { useSettings } from "./hooks/useSettings";
 import { toast } from "sonner";
 import {
     Collapsible,
@@ -441,8 +439,10 @@ export function AppSidebarInner() {
         () =>
             (chatsQuery.data ?? []).reduce(
                 (acc: Record<string, Chat[]>, chat) => {
-                    const prev = acc[chat.projectId] ?? [];
-                    acc[chat.projectId] = [...prev, chat];
+                    // Merge quick-chat into default list
+                    const projectId = chat.projectId === "quick-chat" ? "default" : chat.projectId;
+                    const prev = acc[projectId] ?? [];
+                    acc[projectId] = [...prev, chat];
                     return acc;
                 },
                 {} as Record<string, Chat[]>,
@@ -468,14 +468,6 @@ export function AppSidebarInner() {
                       ),
             ),
         [defaultChats, showAllChats],
-    );
-    const quickChats = useMemo(
-        () =>
-            filterChatsForDisplay(
-                chatsByProject["quick-chat"] || [],
-                currentChatId,
-            ),
-        [chatsByProject, currentChatId],
     );
     const projectsToDisplay = useMemo(
         () =>
@@ -667,127 +659,41 @@ export function AppSidebarInner() {
                 </div>
             </DndContext>
 
-            {/* Ambient chats positioned fixed relative to the sidebar */}
-            <QuickChats chats={quickChats} />
-        </SidebarContent>
-    );
-}
-
-function QuickChats({ chats }: { chats: Chat[] }) {
-    const navigate = useNavigate();
-    const settings = useSettings();
-    const convertQuickChatToRegularChat =
-        ChatAPI.useConvertQuickChatToRegularChat();
-
-    const handleQuickChatConversion = async (
-        e: React.MouseEvent,
-        chat: Chat,
-    ) => {
-        e.preventDefault();
-        await convertQuickChatToRegularChat.mutateAsync({
-            chatId: chat.id,
-        });
-        navigate(`/chat/${chat.id}`);
-    };
-
-    return (
-        <div className="relative pb-2 pr-2 bg-sidebar z-10">
-            <SidebarMenu>
-                <Collapsible className="group/collapsible data-[state=open]/collapsible:border-t pt-2 mb-1 flex items-stretch w-full">
+            {/* Bottom bar with feedback and settings */}
+            <div className="relative pb-2 pr-2 bg-sidebar z-10">
+                <SidebarMenu>
                     <SidebarMenuItem className="w-full">
-                        <div className="h-6 w-full flex justify-between">
-                            <span className="h-full group-data-[state=open]/collapsible:hidden px-3 flex items-center gap-2">
-                                <FeedbackButton className="h-full text-sm flex items-center text-muted-foreground rounded-full px-2 py-1 border border-sidebar-border hover:text-sidebar-accent-foreground">
-                                    Feedback
-                                    <SpeakerLoudIcon className="inline-block ml-2 h-3 w-3" />
-                                </FeedbackButton>
-                            </span>
-                            <div className="flex items-center gap-2">
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <CollapsibleTrigger asChild>
-                                            <button className="h-full text-muted-foreground/75 hover:text-foreground p-2 rounded-full flex items-center gap-2 group-data-[state=open]/collapsible:w-full">
-                                                <ArchiveIcon
-                                                    className="w-4 h-4 group-data-[state=open]/collapsible:hidden block"
-                                                    strokeWidth={1.5}
-                                                />
-                                                <ChevronDownIcon
-                                                    className="w-4 h-4 group-data-[state=open]/collapsible:block hidden"
-                                                    strokeWidth={1.5}
-                                                />
-
-                                                <span className="text-sm hidden group-data-[state=open]/collapsible:block">
-                                                    Ambient Chats
-                                                </span>
-                                            </button>
-                                        </CollapsibleTrigger>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom">
-                                        Ambient Chats
-                                    </TooltipContent>
-                                </Tooltip>
-
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <button
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                void emit("open_settings", {
-                                                    tab: "general",
-                                                });
-                                            }}
-                                            className="h-full text-muted-foreground/75 hover:text-foreground p-2 rounded-full flex items-center gap-2 group-data-[state=open]/collapsible:hidden"
-                                        >
-                                            <Settings
-                                                className="h-4 w-4"
-                                                strokeWidth={1.5}
-                                            />
-                                        </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom">
-                                        Settings <kbd>⌘,</kbd>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </div>
+                        <div className="h-6 w-full flex justify-between px-3">
+                            <FeedbackButton className="h-full text-sm flex items-center text-muted-foreground rounded-full px-2 py-1 border border-sidebar-border hover:text-sidebar-accent-foreground">
+                                Feedback
+                                <SpeakerLoudIcon className="inline-block ml-2 h-3 w-3" />
+                            </FeedbackButton>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            void emit("open_settings", {
+                                                tab: "general",
+                                            });
+                                        }}
+                                        className="h-full text-muted-foreground/75 hover:text-foreground p-2 rounded-full flex items-center gap-2"
+                                    >
+                                        <Settings
+                                            className="h-4 w-4"
+                                            strokeWidth={1.5}
+                                        />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    Settings <kbd>⌘,</kbd>
+                                </TooltipContent>
+                            </Tooltip>
                         </div>
-
-                        <CollapsibleContent className="max-h-[400px] overflow-y-auto no-scrollbar">
-                            <SidebarGroup className="min-h-0">
-                                <SidebarGroupContent>
-                                    {chats.map((chat) => (
-                                        <SidebarMenuItem key={chat.id}>
-                                            <SidebarMenuButton
-                                                onClick={(e) =>
-                                                    void handleQuickChatConversion(
-                                                        e,
-                                                        chat,
-                                                    )
-                                                }
-                                                className="text-sidebar-accent-foreground truncate group/chat-button flex justify-between"
-                                            >
-                                                <span className="truncate pr-3 text-sm">
-                                                    {chat.title ||
-                                                        "Untitled Chat"}
-                                                </span>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                    ))}
-                                </SidebarGroupContent>
-                            </SidebarGroup>
-                            {!chats.length && (
-                                <div className="px-2 py-2 text-sm text-muted-foreground">
-                                    Start an Ambient Chat with{" "}
-                                    <span className="text-sm">
-                                        {settings?.quickChat?.shortcut ||
-                                            "⌥Space"}
-                                    </span>
-                                </div>
-                            )}
-                        </CollapsibleContent>
                     </SidebarMenuItem>
-                </Collapsible>
-            </SidebarMenu>
-        </div>
+                </SidebarMenu>
+            </div>
+        </SidebarContent>
     );
 }
 
