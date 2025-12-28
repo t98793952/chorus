@@ -28,6 +28,7 @@ import { UserTool, UserToolCall, UserToolResult } from "../Toolsets";
 import { produce } from "immer";
 import _ from "lodash";
 import { useAppContext } from "@ui/hooks/useAppContext";
+import * as ChatAPI from "./ChatAPI";
 import { db } from "../DB";
 import { draftKeys } from "./DraftAPI";
 import { updateSavedModelConfigChat } from "./ModelConfigChatAPI";
@@ -1432,6 +1433,7 @@ export function useStreamMessageLegacy() {
 }
 
 export function useCreateMessageSetPair() {
+    const queryClient = useQueryClient();
     return useMutation({
         mutationKey: ["createMessageSetPair"] as const,
         mutationFn: async ({
@@ -1455,6 +1457,12 @@ export function useCreateMessageSetPair() {
                 [chatId],
             );
 
+            // Mark chat as no longer new (user has sent a message)
+            await db.execute(
+                "UPDATE chats SET is_new_chat = 0 WHERE id = $1",
+                [chatId],
+            );
+
             // Calculate user message set level based on parent
             const userLevel = userMessageSetParent
                 ? userMessageSetParent.level + 1
@@ -1474,6 +1482,12 @@ export function useCreateMessageSetPair() {
             );
 
             return { userMessageSetId, aiMessageSetId };
+        },
+        onSuccess: async (_data, variables) => {
+            await queryClient.invalidateQueries(
+                ChatAPI.chatQueries.detail(variables.chatId),
+            );
+            await queryClient.invalidateQueries(ChatAPI.chatQueries.list());
         },
     });
 }
