@@ -116,6 +116,11 @@ export function JudgeDialog() {
     const { isOpen, isStreaming, judgementText, currentMessageSetId, onStartEvaluation } = useJudgeStore();
     const [copied, setCopied] = React.useState(false);
     const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
+    const [userFocus, setUserFocus] = React.useState("");
+
+    React.useEffect(() => {
+        if (!isOpen) setUserFocus("");
+    }, [isOpen]);
 
     // Query historical evaluations
     const evaluationsQuery = JudgeAPI.useJudgeEvaluations(currentMessageSetId || "");
@@ -162,7 +167,7 @@ export function JudgeDialog() {
 
     const handleSelectModel = (modelId: string) => {
         if (onStartEvaluation) {
-            onStartEvaluation(modelId);
+            onStartEvaluation(modelId, userFocus);
         }
     };
 
@@ -194,6 +199,18 @@ export function JudgeDialog() {
                     {/* Model Selector - show when not evaluating */}
                     {showModelSelector && (
                         <div>
+                            <div className="mb-3">
+                                <span className="text-sm uppercase tracking-wider font-geist-mono text-gray-500">
+                                    Evaluation Focus
+                                </span>
+                                <input
+                                    type="text"
+                                    placeholder="What aspects do you want to focus on?"
+                                    value={userFocus}
+                                    onChange={(e) => setUserFocus(e.target.value)}
+                                    className="w-full mt-1 px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                />
+                            </div>
                             <div className="mb-3 flex items-center gap-2">
                                 <span className="text-sm uppercase tracking-wider font-geist-mono text-gray-500">
                                     Select Judge Model

@@ -61,6 +61,7 @@ function buildJudgePrompt(
     conversationHistory: LLMMessage[],
     currentUserMessage: string,
     modelResponses: Array<{ modelDisplayName: string; content: string }>,
+    userFocus?: string,
 ): string {
     let prompt = "Please evaluate and compare the following AI model responses to the user's question.\n\n";
 
@@ -82,13 +83,14 @@ function buildJudgePrompt(
         prompt += `### Model: ${response.modelDisplayName}\n${response.content}\n\n`;
     });
 
-    prompt += `## Task
-1. Evaluate each response based on accuracy, relevance, completeness, clarity, and helpfulness
-2. Compare the responses and identify strengths and weaknesses
-3. Provide a ranking (if applicable)
-4. Give your recommendation on which response is most helpful for the user
+    if (userFocus?.trim()) {
+        prompt += `## Evaluation Focus (User Specified)\nThe user wants you to pay special attention to: ${userFocus.trim()}\n\n`;
+    }
 
-Please structure your evaluation clearly with sections for each model.`;
+    prompt += `## Task
+1. Determine the most relevant evaluation criteria for this specific question${userFocus?.trim() ? ", with emphasis on the evaluation focus above" : ""}
+2. Score each response on a scale of 1-10 for each criterion you choose
+3. Provide a total score and final ranking`;
 
     return prompt;
 }
@@ -127,6 +129,7 @@ export function useCreateJudgeEvaluation() {
             conversationHistory,
             currentUserMessage,
             modelResponses,
+            userFocus,
             onStreamChunk,
         }: {
             chatId: string;
@@ -140,25 +143,23 @@ export function useCreateJudgeEvaluation() {
                 modelDisplayName: string;
                 content: string;
             }>;
+            userFocus?: string;
             onStreamChunk?: (chunk: string) => void;
         }) => {
             const prompt = buildJudgePrompt(
                 conversationHistory,
                 currentUserMessage,
                 modelResponses,
+                userFocus,
             );
 
-            const systemPrompt = `You are an AI response judge. Your role is to objectively evaluate and compare responses from different AI models based on the following criteria:
+            const systemPrompt = `You are an AI response judge. Your role is to objectively evaluate and compare responses from different AI models.
 
-1. **Accuracy**: Is the information correct and factual?
-2. **Relevance**: Does it directly address the user's question?
-3. **Completeness**: Does it cover all aspects of the question?
-4. **Clarity**: Is it easy to understand and well-structured?
-5. **Helpfulness**: Does it provide actionable or useful information?
+Based on the nature of the question, determine the most appropriate evaluation criteria yourself (e.g., accuracy, creativity, code quality, reasoning depth, etc.).
 
-Provide a fair, unbiased comparison and explain your reasoning.
+Provide a fair, unbiased comparison with scores and explain your reasoning.
 
-**Language**: Respond in the same language as the conversation. Detect the primary language used in the conversation history and model responses, then use that language for your evaluation.`;
+**Language**: Respond in the same language as the conversation.`;
 
             const modelConfig = await fetchModelConfigById(judgeModelId);
             if (!modelConfig) {

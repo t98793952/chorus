@@ -546,7 +546,7 @@ export function ManageModelsBox({
                 <div>
                     {mode.type === "default" &&
                         selectedModelConfigsCompare.length > 0 && (
-                            <div className="px-3 py-2 relative overflow-hidden border-b border-border">
+                            <div className="px-3 py-2 relative overflow-hidden border-b border-border flex items-center gap-2">
                                 <div
                                     className="overflow-x-auto no-scrollbar flex-grow"
                                     ref={containerRef}
@@ -567,7 +567,7 @@ export function ManageModelsBox({
                                         >
                                             {(provided) => (
                                                 <div
-                                                    className="flex items-center gap-2 whitespace-nowrap pr-8"
+                                                    className="flex items-center gap-2 whitespace-nowrap"
                                                     ref={provided.innerRef}
                                                     {...provided.droppableProps}
                                                 >
@@ -592,21 +592,6 @@ export function ManageModelsBox({
                                                         ),
                                                     )}
                                                     {provided.placeholder}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            mode.onClearModelConfigs();
-                                                        }}
-                                                        className="text-sm text-muted-foreground hover:text-foreground flex-shrink-0"
-                                                        title="Clear all models"
-                                                    >
-                                                        Clear{" "}
-                                                        <span className="text-[10px] inline-flex items-center gap-0.5 bg-muted-foreground/10 rounded px-1 py-0.5">
-                                                            <span>⌘</span>
-                                                            <ArrowBigUpIcon className="w-2.5 h-2.5 -mt-0.5" />
-                                                            <span>⌫</span>
-                                                        </span>
-                                                    </button>
                                                 </div>
                                             )}
                                         </Droppable>
@@ -614,8 +599,23 @@ export function ManageModelsBox({
                                 </div>
                                 {/* Gradient overlay */}
                                 {showMoreIndicator && (
-                                    <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-r from-transparent to-background pointer-events-none"></div>
+                                    <div className="absolute right-8 top-0 bottom-0 w-12 bg-gradient-to-r from-transparent to-background pointer-events-none"></div>
                                 )}
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        mode.onClearModelConfigs();
+                                    }}
+                                    className="text-sm text-muted-foreground hover:text-foreground flex-shrink-0"
+                                    title="Clear all models"
+                                >
+                                    Clear{" "}
+                                    <span className="text-[10px] inline-flex items-center gap-0.5 bg-muted-foreground/10 rounded px-1 py-0.5">
+                                        <span>⌘</span>
+                                        <ArrowBigUpIcon className="w-2.5 h-2.5 -mt-0.5" />
+                                        <span>⌫</span>
+                                    </span>
+                                </button>
                             </div>
                         )}
                     <CommandInput

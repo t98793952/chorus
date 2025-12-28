@@ -5,13 +5,13 @@ interface JudgeStore {
     isStreaming: boolean;
     judgementText: string;
     currentMessageSetId: string | null;
-    onStartEvaluation: ((judgeModelId: string) => void) | null;
+    onStartEvaluation: ((judgeModelId: string, userFocus?: string) => void) | null;
     openDialog: () => void;
     closeDialog: () => void;
     setStreaming: (streaming: boolean) => void;
     appendText: (text: string) => void;
     setMessageSetId: (id: string) => void;
-    setOnStartEvaluation: (callback: ((judgeModelId: string) => void) | null) => void;
+    setOnStartEvaluation: (callback: ((judgeModelId: string, userFocus?: string) => void) | null) => void;
     reset: () => void;
 }
 
@@ -39,7 +39,7 @@ export const judgeActions = {
     setMessageSetId: (id: string) => useJudgeStore.getState().setMessageSetId(id),
     reset: () => useJudgeStore.getState().reset(),
     // Open dialog with callback for starting evaluation
-    openJudgeDialog: (messageSetId: string, onStartEvaluation: (judgeModelId: string) => void) => {
+    openJudgeDialog: (messageSetId: string, onStartEvaluation: (judgeModelId: string, userFocus?: string) => void) => {
         const state = useJudgeStore.getState();
         state.reset();
         state.setMessageSetId(messageSetId);

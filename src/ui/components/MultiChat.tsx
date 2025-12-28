@@ -1504,7 +1504,7 @@ function ToolsBlockView({
     const messageSetsQuery = MessageAPI.useMessageSets(chatId!);
     const modelConfigsQuery = ModelsAPI.useModelConfigs();
 
-    const handleJudge = async (judgeModelId: string) => {
+    const handleJudge = async (judgeModelId: string, userFocus?: string) => {
         if (!messageSetsQuery.data || !modelConfigsQuery.data) return;
 
         // Start evaluation - opens dialog and resets state
@@ -1576,6 +1576,7 @@ function ToolsBlockView({
             conversationHistory,
             currentUserMessage: userMessage,
             modelResponses,
+            userFocus,
             onStreamChunk: (chunk) => {
                 judgeActions.appendText(chunk);
             },
